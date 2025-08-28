@@ -30,7 +30,7 @@ code {
   font-family: 'Nico Moji';
 }
 .hero-section {
-  background-image: url('./assets/image1.webp');
+  background-image: url('./assets/hero1.webp');
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
@@ -152,14 +152,14 @@ label {
 }
 .gallery-container {
   width: 100%;
-  max-width: 1440px;
+  max-width: 2040px;
   margin: 0 auto;
   padding: 0 20px;
 }
 
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
   justify-content: center;
 }

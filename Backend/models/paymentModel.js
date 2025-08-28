@@ -6,6 +6,10 @@ const paymentSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    currency: {
+      type: String,
+      default: "USD",
+    },
     booking: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Booking",
@@ -20,6 +24,14 @@ const paymentSchema = new mongoose.Schema(
       type: String,
       enum: ["pending", "completed", "failed"],
       default: "pending",
+    },
+    provider: {
+      type: String,
+      enum: ["paypal", "stripe"],
+      default: "paypal",
+    },
+    stripePaymentIntentId: {
+      type: String,
     },
   },
   {

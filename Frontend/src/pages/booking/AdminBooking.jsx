@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import axios from 'axios';
 import { FaSearch, FaTrash, FaEye } from 'react-icons/fa';
-import { useNavigate } from 'react-router-dom';
+
+import BookingDetailsModal from '../../components/BookingDetailsModal';
 
 const fetchTotalBookings = async () => {
   const { data } = await axios.get(
@@ -15,11 +16,12 @@ const fetchTotalBookings = async () => {
 };
 
 const AdminBookingPage = () => {
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [selectedStatus, setSelectedStatus] = useState('all');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activeBooking, setActiveBooking] = useState(null);
 
   const { data, isLoading, isError } = useQuery({
     queryKey: ['totalBookings'],
@@ -74,6 +76,16 @@ const AdminBookingPage = () => {
 
     return matchesSearch && matchesType && matchesStatus;
   });
+
+  const openDetails = (booking) => {
+    setActiveBooking(booking);
+    setModalOpen(true);
+  };
+
+  const closeDetails = () => {
+    setModalOpen(false);
+    setActiveBooking(null);
+  };
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -226,7 +238,7 @@ const AdminBookingPage = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
                     className="text-blue-400 hover:text-blue-500 mr-4"
-                    onClick={() => navigate(`/admin/bookings/${booking._id}`)}
+                    onClick={() => openDetails(booking)}
                   >
                     <FaEye className="text-xl" />
                   </button>
@@ -242,6 +254,9 @@ const AdminBookingPage = () => {
           </tbody>
         </table>
       </div>
+      {modalOpen && (
+        <BookingDetailsModal booking={activeBooking} onClose={closeDetails} />
+      )}
     </div>
   );
 };

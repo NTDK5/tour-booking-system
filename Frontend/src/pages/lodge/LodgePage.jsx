@@ -180,7 +180,7 @@ const LodgePage = () => {
     <>
       <PageMeta
         title="Dorze Lodge - Authentic Cultural Experience"
-        description="Experience authentic Dorze culture in the Ethiopian highlands. Book your stay at our community-run lodge with panoramic mountain views."
+        description="Stay at Dorze Lodge in Ethiopia’s highlands — traditional huts, stunning views, cultural hospitality, and a unique retreat with Dorze Tours."
         keywords="Dorze Lodge, Ethiopia, cultural experience, mountain lodge, community tourism"
       />
       {/* Hero Section */}
@@ -311,7 +311,7 @@ const LodgePage = () => {
           </div>
 
           {/* Booking Form */}
-          <div className="bg-white rounded-2xl shadow-xl p-8 border-2 border-[#FFDA32]/20 hover:border-[#F29404] transition-colors lg:sticky lg:top-8">
+          <div className="bg-white rounded-2xl shadow-xl lg:mx-16 p-8 border-2 border-[#FFDA32]/20 hover:border-[#F29404] transition-colors lg:sticky lg:top-20">
             <h2 className="text-2xl font-bold mb-6">Book Your Stay</h2>
             <FormAuthGuard formTitle="lodge booking">
               <form onSubmit={handleBooking} className="space-y-6">

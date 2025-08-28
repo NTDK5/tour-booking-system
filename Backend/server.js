@@ -21,6 +21,7 @@ const mongoose = require('mongoose');
 const passportConfig = require('./config/passport');
 const customTripRoutes = require('./routes/customTripRoutes.js')
 const app = express();
+const { handleStripeWebhook } = require('./controllers/paymentController');
 
 // Connect to MongoDB
 connectDB();
@@ -37,6 +38,8 @@ app.use(
 );
 
 app.use(morgan("common"));
+// Stripe webhook must be registered BEFORE express.json and with raw body parsing
+app.post('/api/payments/stripe/webhook', express.raw({ type: 'application/json' }), handleStripeWebhook);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true })); // Handles URL encoded data
 app.use(cookieParser());

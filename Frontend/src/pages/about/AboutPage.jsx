@@ -29,7 +29,7 @@ const AboutPage = () => {
     <>
       <PageMeta
         title="About Dorze Tours - Our Story"
-        description="Learn about Dorze Tours' mission to provide authentic Ethiopian experiences and support local communities since 2010."
+        description="Dorze Tours Ethiopia — passionate local experts offering authentic cultural tours, lodge stays, and unforgettable travel experiences across Ethiopia."
         keywords="About Dorze Tours, Ethiopian tourism, community support, travel company"
       />
       <div className="w-full">

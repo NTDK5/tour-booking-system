@@ -4,6 +4,7 @@ import {
   FaIdBadge,
   FaMapMarkerAlt,
   FaUser,
+  FaRoute
 } from 'react-icons/fa';
 import { useSelector } from 'react-redux';
 import { NavLink, Outlet } from 'react-router-dom';
@@ -53,6 +54,16 @@ const UserProfilePage = () => {
               }
             >
               <FaClipboardList /> Booking History
+            </NavLink>
+            <NavLink
+              to="/profile/custom-trip"
+              className={({ isActive }) =>
+                isActive
+                  ? 'w-full flex py-[16px] pl-[30px] bg-[#F29404] text-white items-center gap-2'
+                  : 'w-full flex py-[16px] pl-[30px] text-gray-600 hover:bg-gray-100 items-center gap-2'
+              }
+            >
+              <FaRoute /> Custom Trip Requests
             </NavLink>
           </div>
         </div>

@@ -59,8 +59,8 @@ const TourCard = ({ tour }) => {
 
         <div className="flex items-center justify-between pt-4">
           <span className="text-2xl font-bold text-[#F29404]">
-            ${tour.price}
-            <span className="text-sm text-gray-500"> / person</span>
+            {/* ${tour.price}
+            <span className="text-sm text-gray-500"> / person</span> */}
           </span>
           <button className="bg-[#F29404] text-white px-6 py-2 rounded-lg hover:bg-[#DB8303] transition-colors">
             View Tour

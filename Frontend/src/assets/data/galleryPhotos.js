@@ -18,6 +18,26 @@ import photo9 from '../images/gallery/WhatsApp Image 2025-01-06 at 15.18.44_97a8
 import photo10 from '../images/gallery/WhatsApp Image 2025-01-06 at 15.18.45_c4aa91bf.jpg';
 import photo19 from '../images/gallery/WhatsApp Image 2025-01-13 at 19.45.06_fa389f21.jpg';
 import photo20 from '../images/gallery/WhatsApp Image 2025-01-13 at 19.46.45_56039cf3.jpg';
+import photo21 from '../images/gallery/gallery4.jpg';
+import photo22 from '../images/gallery/gallery5.jpg';
+import photo23 from '../images/gallery/gallery6.jpg';
+import photo24 from '../images/gallery/gallery7.jpg';
+import photo25 from '../images/gallery/gallery8.jpg';
+import photo26 from '../images/gallery/gallery9.jpg';
+import photo27 from '../images/gallery/gallery10.jpg';
+import photo28 from '../images/gallery/gallery11.jpg';
+import photo29 from '../images/gallery/gallery12.jpg';
+import photo30 from '../images/gallery/gallery13.jpg';
+import photo31 from '../images/gallery/gallery14.jpg';
+import photo32 from '../images/gallery/gallery15.jpg';
+import photo33 from '../images/gallery/gallery16.jpg';
+import photo34 from '../images/gallery/gallery17.jpg';
+import photo35 from '../images/gallery/gallery18.jpg';
+import photo36 from '../images/gallery/gallery19.jpg';
+
+
+
+
 export const photos = [
   {
     src: photo1,
@@ -118,6 +138,86 @@ export const photos = [
   },
   {
     src: photo20,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo21,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo22,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo23,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo24,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo25,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo26,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo27,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo28,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo29,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo30,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo31,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo32,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo33,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo34,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo35,
+    width: 2,
+    height: 1,
+  },
+  {
+    src: photo36,
     width: 2,
     height: 1,
   },

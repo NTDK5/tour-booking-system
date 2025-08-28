@@ -5,14 +5,10 @@ import React from 'react';
 import { FaCalendar, FaUsers } from 'react-icons/fa';
 import FormAuthGuard from './FormAuthGuard';
 
-const BookingWidget = ({ price, onBooking, onWishlist, userInfo, tour }) => {
+const BookingWidget = ({ price, onBooking, onWishlist, userInfo, tour, bookingDate, setBookingDate, numberOfPeople, setNumberOfPeople }) => {
     return (
         <div className="bg-white rounded-2xl shadow-lg p-6 sticky top-24">
             <h3 className="text-2xl font-bold mb-4">Book This Tour</h3>
-            <div className="mb-4">
-                <span className="text-3xl font-bold text-[#F29404]">${price}</span>
-                <span className="text-gray-500"> / person</span>
-            </div>
 
             <FormAuthGuard formTitle="booking">
                 <div className="space-y-4">
@@ -28,12 +24,14 @@ const BookingWidget = ({ price, onBooking, onWishlist, userInfo, tour }) => {
                                 type="date"
                                 className="w-full p-2 border rounded-lg"
                                 min={new Date().toISOString().split('T')[0]}
+                                value={bookingDate || ''}
+                                onChange={(e) => setBookingDate && setBookingDate(e.target.value)}
                             />
                         </div>
 
                         <div className="flex items-center gap-3">
                             <FaUsers className="text-[#F29404]" />
-                            <select className="w-full p-2 border rounded-lg">
+                            <select className="w-full p-2 border rounded-lg" value={numberOfPeople || 1} onChange={(e) => setNumberOfPeople && setNumberOfPeople(parseInt(e.target.value))}>
                                 {[...Array(10).keys()].map((num) => (
                                     <option key={num + 1} value={num + 1}>
                                         {num + 1} {num === 0 ? 'Person' : 'People'}

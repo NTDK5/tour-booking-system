@@ -6,7 +6,9 @@ const Tour = require("../models/tourModel");
 const Payment = require("../models/paymentModel");
 const Lodge = require("../models/lodgeModel");
 const Car = require("../models/carModel");
-const axios = require('axios');
+// Removed Chapa's axios usage
+const Stripe = require('stripe');
+const stripe = Stripe(process.env.STRIPE_SECRET_KEY);
 
 // @desc Get all payments
 // @route GET /api/payments
@@ -202,7 +204,7 @@ const handlePaymentCaptureCompleted = async (webhookEvent) => {
     const booking = await Booking.findById(bookingId);
     if (booking) {
       booking.status = "confirmed";
-      booking.paymentResult = webhookEvent.resource; // Store the full webhook event for future reference
+      booking.paymentMethod = 'paypal';
       await booking.save();
     } else {
       console.error("Booking not found for ID:", bookingId);
@@ -218,7 +220,7 @@ const handlePaymentCaptureCompleted = async (webhookEvent) => {
       });
       if (payment) {
         payment.transactionId = captureId; // Now store the capture ID
-        payment.paymentStatus = "completed";
+        payment.status = "completed";
         await payment.save();
       } else {
         console.error("Payment not found for order ID:", relatedIds.order_id);
@@ -260,96 +262,6 @@ const validateWebhook = async (headers, body) => {
   return true; // For now, assume it's valid
 };
 
-const CHAPA_SECRET_KEY = process.env.CHAPA_SECRET_KEY;
-const CHAPA_URL = process.env.CHAPA_URL || 'https://api.chapa.co/v1';
-
-// Initialize payment
-const initializePayment = async (req, res) => {
-  try {
-    const {
-      amount,
-      email,
-      first_name,
-      last_name,
-      tx_ref,
-      callback_url,
-      bookingId,
-    } = req.body;
-
-    const response = await axios.post(
-      `${CHAPA_URL}/transaction/initialize`,
-      {
-        amount,
-        currency: 'ETB',
-        email,
-        first_name,
-        last_name,
-        tx_ref,
-        callback_url,
-        return_url: callback_url,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${CHAPA_SECRET_KEY}`,
-        },
-      }
-    );
-
-    // Create payment record
-    await Payment.create({
-      amount,
-      bookingId,
-      txRef: tx_ref,
-      status: 'pending',
-    });
-
-    res.json(response.data);
-  } catch (error) {
-    console.error('Payment initialization error:', error);
-    res.status(500).json({
-      message: 'Payment initialization failed',
-      error: error.message,
-    });
-  }
-};
-
-// Verify payment
-const verifyPayment = async (req, res) => {
-  try {
-    const { txRef } = req.params;
-
-    const response = await axios.get(
-      `${CHAPA_URL}/transaction/verify/${txRef}`,
-      {
-        headers: {
-          Authorization: `Bearer ${CHAPA_SECRET_KEY}`,
-        },
-      }
-    );
-
-    if (response.data.status === 'success') {
-      // Update payment status
-      const payment = await Payment.findOne({ txRef });
-      if (payment) {
-        payment.status = 'completed';
-        await payment.save();
-
-        // Update booking status
-        await Booking.findByIdAndUpdate(payment.bookingId, {
-          paymentStatus: 'paid',
-        });
-      }
-    }
-
-    res.json(response.data);
-  } catch (error) {
-    console.error('Payment verification error:', error);
-    res.status(500).json({
-      message: 'Payment verification failed',
-      error: error.message,
-    });
-  }
-};
 
 const capturePayment = asyncHandler(async (req, res) => {
   const { orderID } = req.body;
@@ -390,8 +302,115 @@ module.exports = {
   createPayPalPayment,
   handlePayPalWebhook,
   getAllPayments,
-  initializePayment,
-  verifyPayment,
   capturePayment,
   deletePayment
 };
+
+// ===================== STRIPE INTEGRATION =====================
+
+// @desc Create Stripe PaymentIntent
+// @route POST /api/payments/stripe/create-intent
+// @access Private
+const createStripePaymentIntent = asyncHandler(async (req, res) => {
+  const { amount, currency = 'usd', bookingId, description } = req.body;
+
+  if (!amount || !bookingId) {
+    return res.status(400).json({ message: 'amount and bookingId are required' });
+  }
+
+  // Create a txRef we can use across providers
+  const txRef = `stripe_${bookingId}_${Date.now()}`;
+
+  // Create Payment record in pending state
+  await Payment.create({
+    amount,
+    currency: currency.toUpperCase(),
+    booking: bookingId,
+    txRef,
+    status: 'pending',
+    provider: 'stripe',
+  });
+
+  const paymentIntent = await stripe.paymentIntents.create({
+    amount: Math.round(Number(amount) * 100), // cents
+    currency,
+    description: description || 'Dorze Tours booking',
+    metadata: { bookingId, txRef },
+    automatic_payment_methods: { enabled: true },
+  });
+
+  // Save intent id for cross-reference
+  await Payment.findOneAndUpdate(
+    { txRef },
+    { stripePaymentIntentId: paymentIntent.id }
+  );
+
+  res.status(200).json({
+    clientSecret: paymentIntent.client_secret,
+    paymentIntentId: paymentIntent.id,
+    txRef,
+  });
+});
+
+// @desc Stripe webhook
+// @route POST /api/payments/stripe/webhook
+// @access Public
+const handleStripeWebhook = async (req, res) => {
+  const sig = req.headers['stripe-signature'];
+  let event;
+
+  try {
+    // req.body is a Buffer because of express.raw
+    event = stripe.webhooks.constructEvent(
+      req.body,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
+  } catch (err) {
+    return res.status(400).send(`Webhook Error: ${err.message}`);
+  }
+
+  switch (event.type) {
+    case 'payment_intent.succeeded': {
+      const paymentIntent = event.data.object;
+      const { bookingId, txRef } = paymentIntent.metadata || {};
+
+      if (txRef) {
+        const payment = await Payment.findOneAndUpdate(
+          { txRef },
+          { status: 'completed' },
+          { new: true }
+        );
+        if (payment && payment.booking) {
+          await Booking.findByIdAndUpdate(payment.booking, {
+            status: 'confirmed',
+            paymentMethod: 'credit card'
+          });
+        }
+      }
+
+      if (bookingId) {
+        await Booking.findByIdAndUpdate(bookingId, { status: 'confirmed', paymentMethod: 'credit card' });
+      }
+      break;
+    }
+    case 'payment_intent.payment_failed': {
+      const paymentIntent = event.data.object;
+      const { txRef } = paymentIntent.metadata || {};
+      if (txRef) {
+        await Payment.findOneAndUpdate(
+          { txRef },
+          { status: 'failed' }
+        );
+      }
+      break;
+    }
+    default:
+      break;
+  }
+
+  res.json({ received: true });
+};
+
+module.exports.createStripePaymentIntent = createStripePaymentIntent;
+module.exports.handleStripeWebhook = handleStripeWebhook;

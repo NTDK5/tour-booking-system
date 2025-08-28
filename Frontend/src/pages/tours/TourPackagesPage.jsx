@@ -84,7 +84,7 @@ const TourPackagesPage = () => {
     <>
       <PageMeta
         title="Tour Packages - Dorze Tours"
-        description="Explore our curated tour packages across Ethiopia. Cultural, historical, and nature tours for every traveler."
+        description="Explore Ethiopia with Dorze Tours — cultural tour packages to Lalibela, Simien Mountains, Omo Valley & more, guided by local experts."
         keywords="Ethiopia tour packages, cultural tours, historical tours, nature tours"
       />
       <section className="relative h-[50vh] flex items-center justify-center">
@@ -186,9 +186,9 @@ const TourPackagesPage = () => {
                             ({tour.totalRatings})
                           </span>
                         </div>
-                        <span className="text-lg font-bold text-[#F29404]">
+                        {/* <span className="text-lg font-bold text-[#F29404]">
                           ${tour.price}
-                        </span>
+                        </span> */}
                       </div>
 
                       <h3 className="text-xl font-semibold">{tour.title}</h3>

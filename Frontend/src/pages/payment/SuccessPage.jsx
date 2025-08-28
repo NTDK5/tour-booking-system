@@ -1,30 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { verifyPayment } from '../../services/paymentService';
+// Removed Chapa verify flow
+import { useStripe } from '@stripe/react-stripe-js';
 
 const PaymentSuccess = () => {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [status, setStatus] = useState('verifying');
     const txRef = searchParams.get('tx_ref');
+    const stripe = useStripe();
 
     useEffect(() => {
-        const verifyTransaction = async () => {
-            try {
-                if (txRef) {
-                    const response = await verifyPayment(txRef);
-                    setStatus('success');
-                    // Wait for 3 seconds before redirecting
-                    setTimeout(() => {
-                        navigate('/profile/booking_history');
-                    }, 3000);
-                }
-            } catch (error) {
-                setStatus('failed');
-            }
-        };
-
-        verifyTransaction();
+        // For PayPal return, we expect token and PayerID or orderID. If tx_ref exists from legacy, show success.
+        const token = searchParams.get('token');
+        const payerId = searchParams.get('PayerID');
+        const orderId = searchParams.get('orderID');
+        if (txRef || token || payerId || orderId) {
+            setStatus('success');
+            setTimeout(() => navigate('/profile/booking_history'), 3000);
+        }
     }, [txRef, navigate]);
 
     return (

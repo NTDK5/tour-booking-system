@@ -1,10 +1,55 @@
 /* eslint-disable react/prop-types */
 /* eslint-disable no-unused-vars */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { initiatePayment } from '../../services/paymentService';
+import { initiatePayment, createStripePaymentIntent } from '../../services/paymentService';
 import { useSelector } from 'react-redux';
+import { Elements } from '@stripe/react-stripe-js';
+import { loadStripe } from '@stripe/stripe-js';
+
+const stripePromise = loadStripe(process.env.REACT_APP_STRIPE_PUBLISHABLE_KEY);
+
+const StripeCheckoutForm = ({ clientSecret }) => {
+  const { useStripe, useElements, PaymentElement } = require('@stripe/react-stripe-js');
+  const stripe = useStripe();
+  const elements = useElements();
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!stripe || !elements) return;
+    setSubmitting(true);
+    setErrorMessage(null);
+    const { error } = await stripe.confirmPayment({
+      elements,
+      confirmParams: {
+        return_url: `${window.location.origin}/payment/stripe/result`,
+      },
+      redirect: 'always',
+    });
+    if (error) {
+      setErrorMessage(error.message);
+    }
+
+    setSubmitting(false);
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <PaymentElement />
+      {errorMessage && <div className="text-red-600 text-sm">{errorMessage}</div>}
+      <button
+        type="submit"
+        disabled={submitting || !stripe || !elements}
+        className="w-full bg-[#FFDA32] text-white py-3 px-4 rounded-md hover:bg-[#F29404] transition-colors disabled:opacity-50"
+      >
+        {submitting ? 'Processing...' : 'Pay with Card'}
+      </button>
+    </form>
+  );
+};
 
 const Checkout = () => {
   const location = useLocation();
@@ -18,6 +63,11 @@ const Checkout = () => {
   if (!booking) {
     return <Navigate to="/" replace />;
   }
+
+  const [clientSecret, setClientSecret] = useState(null);
+  const [method, setMethod] = useState('paypal');
+
+  const elementsOptions = useMemo(() => ({ clientSecret }), [clientSecret]);
 
   const handlePayment = async () => {
     try {
@@ -40,13 +90,23 @@ const Checkout = () => {
         return_url: `${window.location.origin}/payment/success`,
       };
 
-      const response = await initiatePayment(paymentData);
-
-      if (response.data && response.data.approvalUrl) {
-        window.location.href = response.data.approvalUrl;
+      if (method === 'stripe' || booking.paymentMethod?.toLowerCase() === 'credit card') {
+        const stripeResp = await createStripePaymentIntent({
+          amount: totalAmount,
+          currency: 'usd',
+          bookingId: booking._id,
+          description: `Dorze Tours - ${booking.bookingType}`,
+        });
+        setClientSecret(stripeResp.clientSecret);
+        // After rendering Elements, the submit will confirm without redirect
       } else {
-        console.error('PayPal response:', response.data);
-        throw new Error('PayPal approval URL not found in response');
+        const response = await initiatePayment(paymentData);
+        if (response.data && response.data.approvalUrl) {
+          window.location.href = response.data.approvalUrl;
+        } else {
+          console.error('PayPal response:', response.data);
+          throw new Error('PayPal approval URL not found in response');
+        }
       }
     } catch (err) {
       console.error('Payment error:', err);
@@ -143,7 +203,7 @@ const Checkout = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-gray-50 py-12 flex items-center justify-center">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="bg-white rounded-lg shadow-lg p-6">
           <h2 className="text-2xl font-bold mb-6">Checkout Details</h2>
@@ -173,13 +233,35 @@ const Checkout = () => {
             </div>
           )}
 
-          <button
-            onClick={handlePayment}
-            disabled={loading}
-            className="mt-6 w-full bg-[#FFDA32] text-white py-3 px-4 rounded-md hover:bg-[#F29404] transition-colors disabled:opacity-50"
-          >
-            {loading ? 'Processing...' : 'Pay Now'}
-          </button>
+          {!clientSecret && (
+            <>
+              <div className="mt-4 grid grid-cols-2 gap-4">
+                <label className="flex items-center gap-2 border p-3 rounded cursor-pointer">
+                  <input type="radio" name="method" value="paypal" checked={method === 'paypal'} onChange={() => setMethod('paypal')} />
+                  <span>PayPal</span>
+                </label>
+                <label className="flex items-center gap-2 border p-3 rounded cursor-pointer">
+                  <input type="radio" name="method" value="stripe" checked={method === 'stripe'} onChange={() => setMethod('stripe')} />
+                  <span>Stripe (Card)</span>
+                </label>
+              </div>
+              <button
+                onClick={handlePayment}
+                disabled={loading}
+                className="mt-4 w-full bg-[#FFDA32] text-white py-3 px-4 rounded-md hover:bg-[#F29404] transition-colors disabled:opacity-50"
+              >
+                {loading ? 'Processing...' : 'Continue to Payment'}
+              </button>
+            </>
+          )}
+
+          {clientSecret && (
+            <div className="mt-6">
+              <Elements stripe={stripePromise} options={elementsOptions}>
+                <StripeCheckoutForm clientSecret={clientSecret} />
+              </Elements>
+            </div>
+          )}
         </div>
       </div>
     </div>

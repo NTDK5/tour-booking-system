@@ -20,18 +20,20 @@ export const initiatePayment = async (paymentData) => {
   }
 };
 
-export const verifyPayment = async (txRef) => {
+export const createStripePaymentIntent = async ({ amount, currency = 'usd', bookingId, description }) => {
   try {
-    const response = await axios.get(
-      `${process.env.REACT_APP_API_URL}/api/bookings/payment/verify/${txRef}`,
+    const response = await axios.post(
+      `${process.env.REACT_APP_API_URL}/api/payments/stripe/create-intent`,
+      { amount, currency, bookingId, description },
       {
         withCredentials: true,
+        headers: { 'Content-Type': 'application/json' },
       }
     );
     return response.data;
   } catch (error) {
-    throw new Error(
-      error.response?.data?.message || 'Payment verification failed'
-    );
+    throw new Error(error.response?.data?.message || 'Failed to create Stripe PaymentIntent');
   }
 };
+
+// Removed Chapa verifyPayment

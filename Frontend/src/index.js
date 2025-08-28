@@ -34,6 +34,7 @@ import RegisterPage from './pages/auth/RegisterPage';
 import GoogleAuthHandler from './pages/googleAuthHandler';
 import Checkout from './pages/payment/CheckoutPage';
 import PaymentSuccess from './pages/payment/SucessPage';
+import StripeResult from './pages/payment/StripeResult';
 import GalleryPage from './pages/gallery/GalleryPage';
 import LodgePage from './pages/lodge/LodgePage';
 import AdminPaymentPage from './pages/payment/AdminPaymentPage';
@@ -45,6 +46,8 @@ import AdminCarsPage from './pages/admin/AdminCarsPage';
 import AdminReviewsPage from './pages/reviews/AdminReviewsPage';
 import CustomTripsAdmin from './pages/admin/CustomTripsAdmin';
 import { HelmetProvider } from 'react-helmet-async';
+import CreateCustomTrip from './pages/customTrips/CreateCustomTrip';
+import MyCustomTrips from './pages/customTrips/MyCustomTrips';
 
 const router = createBrowserRouter(
   createRoutesFromElements(
@@ -60,14 +63,18 @@ const router = createBrowserRouter(
       <Route path="/dorze_lodge" element={<LodgePage />} />
       <Route path="/our_packages" element={<TourPackagesPage />} />
       <Route path="/verify_email" element={<VerifyEmailPage />} />
+      <Route path="/custom-trip/create" element={<CreateCustomTrip />} />
+      {/* <Route path="/custom-trip/my-requests" element={<MyCustomTrips />} /> */}
       <Route path="/profile" element={<UserProfilePage />} />
       <Route path="/auth-success" element={<GoogleAuthHandler />} />
       <Route path="profile" element={<UserProfilePage />}>
         <Route index={true} element={<Profile />} />
         <Route path="booking_history" element={<UserBookings />} />
+        <Route path="custom-trip" element={<MyCustomTrips />} />
       </Route>
       <Route path="/checkout" element={<Checkout />} />
       <Route path="/payment/success" element={<PaymentSuccess />} />
+      <Route path="/payment/stripe/result" element={<StripeResult />} />
       {/* Admin routes */}
       <Route path="admin" element={<Admin />}>
         <Route index={true} element={<AdminDashboard />} />

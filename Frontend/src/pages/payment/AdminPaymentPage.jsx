@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import axios from 'axios';
-import { FaSearch } from 'react-icons/fa';
+import { FaSearch, FaEye, FaTrash } from 'react-icons/fa';
+import PaymentDetailsModal from '../../components/PaymentDetailsModal';
 
 const AdminPaymentPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [modalOpen, setModalOpen] = useState(false);
+  const [activePayment, setActivePayment] = useState(null);
 
   const { data: payments, isLoading, isError } = useQuery({
     queryKey: ['payments'],
@@ -43,10 +46,26 @@ const AdminPaymentPage = () => {
       alert("Failed to delete payment");
     }
   };
-  // const filteredPayments = payments.filter(payment =>
-  //   payment.booking.user.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-  //   payment.booking.user.last_name.toLowerCase().includes(searchTerm.toLowerCase())
-  // );
+  const filteredPayments = payments.filter(payment => {
+    const fullName = `${payment?.booking?.user?.first_name || ''} ${payment?.booking?.user?.last_name || ''}`.toLowerCase();
+    const email = payment?.booking?.user?.email?.toLowerCase() || '';
+    const type = (payment?.booking?.bookingType || '').toLowerCase();
+    return (
+      fullName.includes(searchTerm.toLowerCase()) ||
+      email.includes(searchTerm.toLowerCase()) ||
+      type.includes(searchTerm.toLowerCase())
+    );
+  });
+
+  const openDetails = (payment) => {
+    setActivePayment(payment);
+    setModalOpen(true);
+  };
+
+  const closeDetails = () => {
+    setModalOpen(false);
+    setActivePayment(null);
+  };
 
   return (
     <div className="p-6 bg-gray-900 h-max">
@@ -75,7 +94,7 @@ const AdminPaymentPage = () => {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-700">
-            {payments.map(payment => (
+            {filteredPayments.map(payment => (
               <tr key={payment?._id} className="hover:bg-gray-700 transition-colors">
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="text-sm text-white">
@@ -94,10 +113,16 @@ const AdminPaymentPage = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                   <button
-                    onClick={() => handleDelete(payment._id)}
-                    className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                    className="text-blue-400 hover:text-blue-500 mr-4"
+                    onClick={() => openDetails(payment)}
                   >
-                    Delete
+                    <FaEye className="text-xl" />
+                  </button>
+                  <button
+                    onClick={() => handleDelete(payment._id)}
+                    className="text-red-400 hover:text-red-500"
+                  >
+                    <FaTrash className="text-xl" />
                   </button>
 
                 </td>
@@ -107,6 +132,9 @@ const AdminPaymentPage = () => {
 
         </table>
       </div>
+      {modalOpen && (
+        <PaymentDetailsModal payment={activePayment} onClose={closeDetails} />
+      )}
     </div>
   );
 };

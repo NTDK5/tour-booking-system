@@ -76,6 +76,10 @@ const TourDetails = () => {
       navigate('/login');
       return;
     }
+    if (!bookingDate) {
+      alert('Please select a booking date.');
+      return;
+    }
     try {
       const bookingData = {
         bookingType: 'Tour',
@@ -98,10 +102,9 @@ const TourDetails = () => {
         state: {
           booking: {
             _id: data._id,
-            bookingType: "Tour",
+            bookingType: "tour",
             tourTitle: tour.title,
-            checkInDate: bookingDate,
-            checkOutDate: bookingDate,
+            bookingDate,
             numberOfPeople: numberOfPeople,
             tourId: tour._id,
           },
@@ -233,6 +236,10 @@ const TourDetails = () => {
             onWishlist={handleSaveToWishlist}
             userInfo={userInfo}
             tour={tour}
+            bookingDate={bookingDate}
+            setBookingDate={setBookingDate}
+            numberOfPeople={numberOfPeople}
+            setNumberOfPeople={setNumberOfPeople}
           />
         </div>
       </div>

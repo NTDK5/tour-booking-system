@@ -27,9 +27,9 @@ import HeroSection from '../../components/HeroSection.jsx';
 import PageMeta from '../../components/PageMeta';
 
 function HomePage() {
-  useEffect(() => {
-    document.title = 'Dorze Tours - Home ';
-  }, []);
+  // useEffect(() => {
+  //   document.title = 'Dorze Tours - Home ';
+  // }, []);
   const [verificationMessage, setVerificationMessage] = useState('');
   const { userInfo } = useSelector((state) => state.auth);
   const { data, isLoading, isError } = useQuery({
@@ -54,14 +54,14 @@ function HomePage() {
   return (
     <>
       <PageMeta
-        title="Dorze Tours - Authentic Ethiopian Experiences"
-        description="Discover Ethiopia with Dorze Tours. Cultural tours, lodge stays, and car rentals for an authentic Ethiopian experience."
+        title="Dorze Tours | Discover Ethiopia’s Culture, Nature & Lodge"
+        description="Discover authentic Ethiopia cultural tours with Dorze Tours — immersive experiences, traditional Dorze lodging & expert local guides."
         keywords="Ethiopia tours, cultural experiences, Dorze Tours, Ethiopian travel"
       />
       <div className="relative flex flex-col items-center justify-center">
         <HeroSection />
 
-        <section className=" w-[90%] md:w-[80%] flex flex-col md:flex-row items-center justify-center lg:transform lg:translate-y-[-50%] tran rounded-lg  bg-white shadow-md  lg:py-0 py-10">
+        <section className=" w-[90%] md:w-[80%] z-30 flex flex-col md:flex-row items-center justify-center lg:transform lg:translate-y-[-50%] tran rounded-lg  bg-white shadow-md  lg:py-0 py-10">
           <div className="flex flex-col md:flex-row items-center justify-between w-[90%] ">
             <div className="flex flex-col w-full md:w-1/3 mb-4 md:mb-0">
               <div className="flex items-center gap-2 justify-start py-2 px-4">

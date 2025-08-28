@@ -48,8 +48,13 @@ const createBooking = asyncHandler(async (req, res) => {
     totalPrice = tour.price * numberOfPeople;
     bookingDetails = {
       tour: tourId,
-      bookingDate: bookingDate || new Date()
+      // Use the date picked by the user for tour booking
+      bookingDate: bookingDate ? new Date(bookingDate) : undefined
     };
+    if (!bookingDetails.bookingDate) {
+      res.status(400);
+      throw new Error("bookingDate is required for Tour bookings");
+    }
   }
 
   // Handle Lodge booking

@@ -21,6 +21,8 @@ function App() {
     '/payment/success',
     '/profile',
     '/profile/booking_history',
+    '/custom-trip/create',
+    '/profile/custom-trip',
   ];
 
   return (

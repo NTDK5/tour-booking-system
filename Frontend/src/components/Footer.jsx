@@ -60,10 +60,10 @@ const Footer = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-bold text-gray-800">Explore</h3>
             <div className="grid grid-cols-1 gap-3">
-              {['Home', 'About Us', 'Destinations', 'Tours', 'Contact', 'Gallery'].map((link) => (
+              {['Home', 'About Us', 'Dorze Lodge', 'Our Packages', 'Cars', 'Gallery'].map((link) => (
                 <Link
                   key={link}
-                  to="/"
+                  to={`/${link.toLowerCase().replace(/\s+/g, '_')}`}
                   className="text-gray-600 hover:text-[#F29404] transition-colors"
                 >
                   {link}
@@ -79,7 +79,7 @@ const Footer = () => {
               {['Omo Valley', 'Harar', 'Bale Mountains', 'Arbaminch', 'Lalibela', 'Simien Mountains'].map((tour) => (
                 <Link
                   key={tour}
-                  to="/"
+                  to="/our_packages"
                   className="text-gray-600 hover:text-[#F29404] transition-colors"
                 >
                   {tour}
