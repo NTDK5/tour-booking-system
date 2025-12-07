@@ -60,24 +60,35 @@ const getLodgeById = asyncHandler(async (req, res) => {
 // @route PUT /api/lodges/:id
 // @access Private/Admin
 const updateLodge = asyncHandler(async (req, res) => {
-  const { name, location, price, amenities, description } = req.body;
-
+  const {
+    name,
+    location,
+    roomTypes,
+    description,
+    images,
+    contactInfo,
+  } = req.body;
   const lodge = await Lodge.findById(req.params.id);
 
-  if (lodge) {
-    lodge.name = name || lodge.name;
-    lodge.location = location || lodge.location;
-    lodge.price = price || lodge.price;
-    lodge.amenities = amenities || lodge.amenities;
-    lodge.description = description || lodge.description;
-
-    const updatedLodge = await lodge.save();
-    res.status(200).json(updatedLodge);
-  } else {
+  if (!lodge) {
     res.status(404);
     throw new Error("Lodge not found");
   }
+
+  lodge.name = name || lodge.name;
+  lodge.location = location || lodge.location;
+  lodge.description = description || lodge.description;
+
+  // Arrays and objects must be replaced carefully
+  if (roomTypes) lodge.roomTypes = roomTypes;
+  if (images) lodge.images = images;
+  if (contactInfo) lodge.contactInfo = contactInfo;
+
+  const updatedLodge = await lodge.save();
+
+  res.status(201).json(updatedLodge);
 });
+
 
 // @desc Delete a lodge
 // @route DELETE /api/lodges/:id
