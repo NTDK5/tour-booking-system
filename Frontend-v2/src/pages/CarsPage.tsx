@@ -13,6 +13,7 @@ import carouselHero from '@/assets/images/carousel-2.jpg';
 import { useCars } from '@/hooks/useCars';
 import { useCreateBooking } from '@/hooks/useBookings';
 import RequestCarModal from '@/components/custom/RequestCarModal';
+import { resolveImageUrl } from '@/utils/url';
 
 export default function CarsPage() {
     const { data: cars = [], isLoading, isError, refetch } = useCars();
@@ -22,7 +23,7 @@ export default function CarsPage() {
         capacity: car.capacity || car.seats || 1,
         transmission: (car.transmission || '').toLowerCase(),
         fuelType: (car.fuelType || '').toLowerCase(),
-        images: Array.isArray(car.images) ? car.images : [],
+        images: Array.isArray(car.images) ? car.images.map((img: string) => resolveImageUrl(img)) : [],
     }));
     const [selectedCar, setSelectedCar] = useState<any | null>(null);
     const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);

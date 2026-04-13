@@ -15,6 +15,7 @@ import toast from 'react-hot-toast';
 export default function CustomTripManagementPage() {
     const [activeTab, setActiveTab] = useState<'options' | 'requests'>('requests');
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
+    const [detailRequest, setDetailRequest] = useState<any>(null);
     const [proposedPrice, setProposedPrice] = useState('');
 
     const { data: options = [], isLoading: optionsLoading } = useCustomTripOptions();
@@ -135,7 +136,7 @@ export default function CustomTripManagementPage() {
                                         Propose Price
                                     </Button>
                                 )}
-                                <Button variant="outline" className="w-full rounded-2xl">
+                                <Button variant="outline" className="w-full rounded-2xl" onClick={() => setDetailRequest(req)}>
                                     <Eye size={16} className="mr-2" /> View Details
                                 </Button>
                             </div>
@@ -237,6 +238,90 @@ export default function CustomTripManagementPage() {
                             >
                                 Send Proposal
                             </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {detailRequest && (
+                <div className="fixed inset-0 bg-black/65 backdrop-blur-sm z-[160] flex items-center justify-center p-4">
+                    <div className="bg-surface-light border border-surface-border rounded-3xl p-8 w-full max-w-4xl space-y-6 shadow-2xl max-h-[88vh] overflow-y-auto">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h3 className="text-2xl font-bold text-white">Custom Trip Details</h3>
+                                <p className="text-xs text-neutral-500 mt-1">#{detailRequest._id?.slice(-8).toUpperCase()}</p>
+                            </div>
+                            <Button variant="outline" onClick={() => setDetailRequest(null)}>Close</Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                                <p className="text-[10px] uppercase text-neutral-500 font-bold">Guest</p>
+                                <p className="text-sm font-bold text-white mt-1">{detailRequest.user?.first_name} {detailRequest.user?.last_name}</p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                                <p className="text-[10px] uppercase text-neutral-500 font-bold">Duration</p>
+                                <p className="text-sm font-bold text-white mt-1">{detailRequest.days} Days</p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                                <p className="text-[10px] uppercase text-neutral-500 font-bold">Status</p>
+                                <p className="text-sm font-bold text-white mt-1 uppercase">{detailRequest.booking?.status || 'submitted'}</p>
+                            </div>
+                            <div className="p-4 rounded-2xl bg-surface border border-surface-border">
+                                <p className="text-[10px] uppercase text-neutral-500 font-bold">Final Price</p>
+                                <p className="text-sm font-bold text-primary mt-1">${detailRequest.finalPrice || detailRequest.booking?.proposedPrice || detailRequest.booking?.totalPrice || 0}</p>
+                            </div>
+                        </div>
+
+                        <div className="p-5 rounded-2xl bg-surface border border-surface-border">
+                            <h4 className="text-sm font-bold uppercase tracking-widest text-neutral-400 mb-4">Price Breakdown</h4>
+                            {detailRequest.pricingBreakdown ? (
+                                <div className="grid md:grid-cols-2 gap-3 text-sm">
+                                    <div className="flex justify-between"><span className="text-neutral-500">Base per day</span><span className="text-white">${detailRequest.pricingBreakdown.basePerDay || 0}</span></div>
+                                    <div className="flex justify-between"><span className="text-neutral-500">Days cost</span><span className="text-white">${detailRequest.pricingBreakdown.daysCost || 0}</span></div>
+                                    <div className="flex justify-between"><span className="text-neutral-500">Options cost</span><span className="text-white">${detailRequest.pricingBreakdown.optionsCost || 0}</span></div>
+                                    <div className="flex justify-between"><span className="text-neutral-500">Mode multiplier</span><span className="text-white">x{detailRequest.pricingBreakdown.modeMultiplier || 1}</span></div>
+                                    <div className="flex justify-between"><span className="text-neutral-500">Subtotal</span><span className="text-white">${detailRequest.pricingBreakdown.subtotal || 0}</span></div>
+                                    <div className="flex justify-between font-bold"><span className="text-neutral-300">Final total</span><span className="text-primary">${detailRequest.pricingBreakdown.finalTotal || detailRequest.finalPrice || 0}</span></div>
+                                </div>
+                            ) : (
+                                <p className="text-sm text-neutral-500">No pricing breakdown available.</p>
+                            )}
+                        </div>
+
+                        <div className="space-y-4">
+                            <h4 className="text-sm font-bold uppercase tracking-widest text-neutral-400">Itinerary Details</h4>
+                            {(detailRequest.itinerary || []).length === 0 ? (
+                                <p className="text-sm text-neutral-500">No itinerary details submitted.</p>
+                            ) : (
+                                (detailRequest.itinerary || []).map((day: any, idx: number) => (
+                                    <div key={idx} className="p-4 rounded-2xl bg-surface border border-surface-border space-y-2">
+                                        <div className="flex items-center justify-between">
+                                            <p className="font-bold text-white">Day {day.day || idx + 1}</p>
+                                            <Badge variant="outline">
+                                                {day.destination?.name || day.destinationId || 'Destination not set'}
+                                            </Badge>
+                                        </div>
+                                        <p className="text-sm text-neutral-400">
+                                            Itinerary: {day.itineraryItem?.title || day.itineraryItemId || 'No itinerary package selected'}
+                                        </p>
+                                        {day.itineraryItem?.price !== undefined && (
+                                            <p className="text-sm text-primary font-bold">Itinerary Price: ${day.itineraryItem.price}</p>
+                                        )}
+                                        {(day.itineraryItem?.activities || []).length > 0 && (
+                                            <div>
+                                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Activities</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {day.itineraryItem.activities.map((act: any, aIdx: number) => (
+                                                        <Badge key={aIdx} variant="secondary">{act.title || 'Activity'}</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {day.notes && <p className="text-xs text-neutral-500">Notes: {day.notes}</p>}
+                                    </div>
+                                ))
+                            )}
                         </div>
                     </div>
                 </div>

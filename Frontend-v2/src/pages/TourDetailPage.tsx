@@ -32,6 +32,25 @@ export default function TourDetailPage() {
         trekking: 'bg-green-500/20 text-green-400',
     };
 
+    const defaultIncluded = [
+        'Professional local guide',
+        'Ground transportation during the tour',
+        'Accommodation as per itinerary',
+        'Daily breakfast and bottled water',
+        'All listed activities and site visits',
+    ];
+
+    const defaultExcluded = [
+        'International and domestic flights',
+        'Travel insurance',
+        'Personal expenses and tips',
+        'Lunch and dinner unless specified',
+        'Visa fees and optional activities',
+    ];
+
+    const includedItems = Array.from(new Set([...(tour.included || []), ...defaultIncluded]));
+    const excludedItems = Array.from(new Set([...(tour.excluded || []), ...defaultExcluded]));
+
     return (
         <div className="min-h-screen bg-surface">
             {/* Hero Section / Gallery */}
@@ -144,7 +163,7 @@ export default function TourDetailPage() {
                                         What's Included
                                     </h3>
                                     <ul className="space-y-4">
-                                        {tour.included?.map((item, idx) => (
+                                        {includedItems.map((item, idx) => (
                                             <li key={idx} className="flex gap-3 text-neutral-400 text-sm">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-success mt-1.5 shrink-0" />
                                                 {item}
@@ -158,7 +177,7 @@ export default function TourDetailPage() {
                                         Not Included
                                     </h3>
                                     <ul className="space-y-4">
-                                        {tour.excluded?.map((item, idx) => (
+                                        {excludedItems.map((item, idx) => (
                                             <li key={idx} className="flex gap-3 text-neutral-400 text-sm">
                                                 <span className="w-1.5 h-1.5 rounded-full bg-error mt-1.5 shrink-0" />
                                                 {item}
@@ -186,7 +205,7 @@ export default function TourDetailPage() {
 
                                             <div className="bg-surface-light rounded-3xl p-6 border border-surface-border shadow-soft">
                                                 <h4 className="text-xl font-bold text-white mb-3">{day.title}</h4>
-                                                <p className="text-neutral-400 text-sm leading-relaxed">{day.description}</p>
+                                                <p className="text-neutral-300 text-base leading-relaxed">{day.description}</p>
 
                                                 {day.activities && day.activities.length > 0 && (
                                                     <div className="flex flex-wrap gap-2 mt-4">
@@ -196,7 +215,7 @@ export default function TourDetailPage() {
                                                             const time = isObject ? (act as any).time : '';
 
                                                             return (
-                                                                <Badge key={i} variant="secondary" className="bg-surface text-[10px] gap-1.5 py-1 px-3">
+                                                                <Badge key={i} variant="secondary" className="bg-surface text-xs gap-1.5 py-1.5 px-3.5">
                                                                     {time && <span className="text-primary/70 font-mono uppercase tracking-tighter">{time}</span>}
                                                                     <span>{label}</span>
                                                                 </Badge>

@@ -5,10 +5,7 @@ import {
     Calendar as CalendarIcon,
     Filter,
     Info,
-    Lock,
-    Unlock,
     CheckCircle2,
-    XCircle,
     Hotel,
     Globe,
     Car
@@ -25,7 +22,6 @@ import {
     isSameMonth,
     isSameDay,
     isToday,
-    addDays
 } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
@@ -40,6 +36,7 @@ export default function AdminCalendar() {
     const [selectedType, setSelectedType] = useState<ResourceType>('Lodge');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [selectedDayBookings, setSelectedDayBookings] = useState<any[] | null>(null);
+    const [selectedBookingDetail, setSelectedBookingDetail] = useState<any | null>(null);
 
     // Generate calendar days
     const calendarDays = useMemo(() => {
@@ -68,6 +65,31 @@ export default function AdminCalendar() {
             const dateValue = booking.checkInDate || booking.bookingDate || booking.createdAt;
             return dateValue ? isSameDay(new Date(dateValue), day) : false;
         });
+    };
+
+    const getDaySummary = (day: Date) => {
+        const content = getDayContent(day);
+        const dayBookings = getDayBookings(day);
+        const bookingCount = dayBookings.length;
+
+        const isLodge = selectedType === 'Lodge';
+        const isBlocked = content?.status === 'blocked' || content?.status === 'maintenance';
+        const isFullyBooked = content?.status === 'fully_booked';
+        const isCapacityFull = typeof content?.bookedCapacity === 'number' &&
+            typeof content?.totalCapacity === 'number' &&
+            content.totalCapacity > 0 &&
+            content.bookedCapacity >= content.totalCapacity;
+
+        const available = !(isBlocked || isFullyBooked || isCapacityFull);
+        const label = isLodge
+            ? (available ? 'Available' : 'Not Available')
+            : (isBlocked ? 'Blocked' : isFullyBooked ? 'Fully Booked' : 'Open');
+
+        const style = available
+            ? 'bg-success/10 text-success'
+            : 'bg-error/10 text-error';
+
+        return { content, dayBookings, bookingCount, label, style };
     };
 
     if (isLoading) {
@@ -146,7 +168,8 @@ export default function AdminCalendar() {
 
                 <div className="grid grid-cols-7">
                     {calendarDays.map((day, idx) => {
-                        const content = getDayContent(day);
+                        const summary = getDaySummary(day);
+                        const content = summary.content;
                         const isCurrentMonth = isSameMonth(day, currentMonth);
 
                         return (
@@ -176,32 +199,27 @@ export default function AdminCalendar() {
                                     {content ? (
                                         <div className={`
                                             p-2 rounded-lg text-[10px] font-bold uppercase tracking-tight flex flex-col items-center justify-center text-center leading-tight
-                                            ${content.status === 'fully_booked' ? 'bg-error/10 text-error' :
-                                                content.status === 'blocked' ? 'bg-neutral-800 text-neutral-400' :
-                                                    'bg-success/10 text-success'}
+                                            ${summary.style}
                                         `}>
-                                            <span>{content.status === 'blocked' ? 'BLOCKED' : 'AVAILABLE'}</span>
-                                            <span className="text-xs opacity-80">{content.value}</span>
+                                            <span>{summary.label}</span>
+                                            {typeof content.bookedCapacity === 'number' && typeof content.totalCapacity === 'number' && (
+                                                <span className="text-xs opacity-80">{content.bookedCapacity}/{content.totalCapacity}</span>
+                                            )}
                                         </div>
                                     ) : (
                                         <div className="p-2 rounded-lg bg-success/5 text-success/40 text-[10px] font-bold text-center border border-dashed border-success/20 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            OPEN
+                                            {selectedType === 'Lodge' ? 'AVAILABLE' : 'OPEN'}
                                         </div>
                                     )}
                                     <div className="mt-1 px-2 py-1 rounded-md bg-surface-dark/40 text-[10px] text-center">
-                                        {getDayBookings(day).length} bookings
+                                        {summary.bookingCount} bookings
                                     </div>
                                     <button
-                                        onClick={() => setSelectedDayBookings(getDayBookings(day))}
+                                        onClick={() => setSelectedDayBookings(summary.dayBookings)}
                                         className="mt-1 text-[10px] px-2 py-1 rounded-md border border-surface-border hover:border-primary"
                                     >
                                         Show details
                                     </button>
-                                </div>
-
-                                {/* Quick Action Menu (Hover) */}
-                                <div className="absolute inset-0 bg-primary/90 opacity-0 group-hover:bg-opacity-95 flex items-center justify-center gap-2 pointer-events-none group-hover:pointer-events-auto">
-                                    {/* These would be buttons for block/unblock etc */}
                                 </div>
                             </div>
                         );
@@ -242,7 +260,7 @@ export default function AdminCalendar() {
                             <div className="space-y-3 max-h-[55vh] overflow-y-auto">
                                 {selectedDayBookings.map((b: any) => (
                                     <div key={b._id} className="p-3 rounded-xl bg-surface border border-surface-border">
-                                        <div className="flex items-center justify-between">
+                                        <div className="flex items-center justify-between gap-3">
                                             <p className="font-bold text-sm">
                                                 {(b.tour as any)?.title || (b.lodge as any)?.name || (b.car as any)?.brand || (b.customTrip ? 'Custom Trip' : 'Booking')}
                                             </p>
@@ -251,8 +269,64 @@ export default function AdminCalendar() {
                                         <p className="text-xs text-neutral-500 mt-1">
                                             #{b._id.slice(-8).toUpperCase()} | {(b.user as any)?.first_name || 'Guest'} {(b.user as any)?.last_name || ''}
                                         </p>
+                                        <div className="mt-3 flex justify-end">
+                                            <Button size="sm" variant="outline" onClick={() => setSelectedBookingDetail(b)}>
+                                                View Booking Details
+                                            </Button>
+                                        </div>
                                     </div>
                                 ))}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {selectedBookingDetail && (
+                <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[210] flex items-center justify-center p-4">
+                    <div className="w-full max-w-2xl bg-surface-light border border-surface-border rounded-2xl p-6 space-y-5">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold">Booking Detail</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedBookingDetail(null)}>Close</Button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div><p className="text-neutral-500">Booking ID</p><p className="font-bold">#{selectedBookingDetail._id.slice(-8).toUpperCase()}</p></div>
+                            <div><p className="text-neutral-500">Status</p><p className="font-bold uppercase">{selectedBookingDetail.status}</p></div>
+                            <div><p className="text-neutral-500">Type</p><p className="font-bold uppercase">{selectedBookingDetail.customTrip ? 'custom' : selectedBookingDetail.bookingType}</p></div>
+                            <div><p className="text-neutral-500">Total Price</p><p className="font-bold">{selectedBookingDetail.totalPrice > 0 ? `$${selectedBookingDetail.totalPrice}` : 'TBD'}</p></div>
+                            <div><p className="text-neutral-500">Booking Date</p><p className="font-bold">{selectedBookingDetail.bookingDate ? format(new Date(selectedBookingDetail.bookingDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
+                            <div><p className="text-neutral-500">Check-in</p><p className="font-bold">{selectedBookingDetail.checkInDate ? format(new Date(selectedBookingDetail.checkInDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
+                            <div><p className="text-neutral-500">Check-out</p><p className="font-bold">{selectedBookingDetail.checkOutDate ? format(new Date(selectedBookingDetail.checkOutDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
+                            <div><p className="text-neutral-500">Guests</p><p className="font-bold">{selectedBookingDetail.numberOfPeople || 1}</p></div>
+                        </div>
+
+                        <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                            <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Guest</p>
+                            <p className="text-sm font-bold">
+                                {(selectedBookingDetail.user as any)?.first_name || 'Guest'} {(selectedBookingDetail.user as any)?.last_name || ''}
+                            </p>
+                            <p className="text-xs text-neutral-500 mt-1">{(selectedBookingDetail.user as any)?.email || 'No email'}</p>
+                        </div>
+
+                        {(selectedBookingDetail.tour || selectedBookingDetail.lodge || selectedBookingDetail.car || selectedBookingDetail.customTrip) && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Service</p>
+                                <p className="text-sm font-bold">
+                                    {(selectedBookingDetail.tour as any)?.title ||
+                                        (selectedBookingDetail.lodge as any)?.name ||
+                                        ((selectedBookingDetail.car as any)?.brand
+                                            ? `${(selectedBookingDetail.car as any)?.brand} ${(selectedBookingDetail.car as any)?.model || ''}`
+                                            : '') ||
+                                        (selectedBookingDetail.customTrip ? 'Custom Trip' : 'N/A')}
+                                </p>
+                            </div>
+                        )}
+
+                        {selectedBookingDetail.notes && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Notes</p>
+                                <p className="text-sm">{selectedBookingDetail.notes}</p>
                             </div>
                         )}
                     </div>
