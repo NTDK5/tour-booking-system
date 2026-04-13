@@ -1,0 +1,22 @@
+﻿Testing imports...
+dotenv ok
+express ok
+basic deps ok
+config/db ok
+utils/logger ok
+middleware/errorMiddleware ok
+middleware/rateLimiter ok
+Testing routes...
+routes/userRoutes ok
+routes/tourRoutes ok
+routes/bookingRoutes ok
+routes/reviewRoutes ok
+routes/paymentRoutes ok
+routes/lodgeRoutes ok
+routes/carRoutes ok
+routes/customTripRoutes ok
+Testing controllers...
+controllers/paymentController ok
+Testing passport config...
+config/passport ok
+All imports successful!
