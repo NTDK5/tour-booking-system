@@ -8,6 +8,10 @@ import {
     checkAvailability,
     getBookingById,
     cancelBooking,
+    deleteBooking,
+    respondToOffer,
+    confirmRequestBooking,
+    getBookingTimeline,
 } from '../controllers/bookingController';
 
 import { bookingSchema, updateBookingSchema } from '../schemas/bookingSchemas';
@@ -21,10 +25,14 @@ router.route('/')
 
 router.get('/user', protect, getUserBookings);
 router.get('/check-availability', protect, checkAvailability);
+router.get('/:id/timeline', protect, getBookingTimeline);
+router.put('/:id/respond-offer', protect, respondToOffer);
+router.put('/:id/confirm-request', protect, admin, confirmRequestBooking);
 router.delete('/:id/cancel', protect, cancelBooking);
 
 router.route('/:id')
     .get(protect, getBookingById)
-    .put(protect, admin, updateBooking);
+    .put(protect, admin, updateBooking)
+    .delete(protect, deleteBooking);
 
 export default router;

@@ -95,7 +95,7 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                             <label className="text-sm font-medium">Type of Booking</label>
                             <select
                                 {...register('bookingType')}
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border focus:ring-2 focus:ring-primary outline-none text-sm"
+                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border focus:ring-2 focus:ring-primary outline-none text-sm text-white"
                             >
                                 <option value="Lodge">Lodge Stay</option>
                                 <option value="Tour">Guided Tour</option>
@@ -163,7 +163,7 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                                 <label className="text-sm font-medium">Status</label>
                                 <select
                                     {...register('paymentStatus')}
-                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm"
+                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm text-white"
                                 >
                                     <option value="unpaid">Unpaid</option>
                                     <option value="partial">Partial</option>
@@ -174,7 +174,7 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                                 <label className="text-sm font-medium">Method</label>
                                 <select
                                     {...register('paymentMethod')}
-                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm"
+                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm text-white"
                                 >
                                     <option value="cash">Cash</option>
                                     <option value="bank transfer">Bank Transfer</option>
@@ -191,7 +191,7 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                     <label className="text-sm font-medium">Internal Notes</label>
                     <textarea
                         {...register('internalNotes')}
-                        className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border focus:ring-2 focus:ring-primary outline-none text-sm min-h-[100px]"
+                        className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border focus:ring-2 focus:ring-primary outline-none text-sm text-white placeholder:text-neutral-500 min-h-[100px]"
                         placeholder="Add any specific guest requests or internal operational notes here..."
                     />
                 </div>

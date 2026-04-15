@@ -204,8 +204,8 @@ export default function TourDetailPage() {
                                             </div>
 
                                             <div className="bg-surface-light rounded-3xl p-6 border border-surface-border shadow-soft">
-                                                <h4 className="text-xl font-bold text-white mb-3">{day.title}</h4>
-                                                <p className="text-neutral-300 text-base leading-relaxed">{day.description}</p>
+                                                <h4 className="text-2xl font-bold text-white mb-3">{day.title}</h4>
+                                                <p className="text-neutral-300 text-lg leading-relaxed">{day.description}</p>
 
                                                 {day.activities && day.activities.length > 0 && (
                                                     <div className="flex flex-wrap gap-2 mt-4">
@@ -215,7 +215,7 @@ export default function TourDetailPage() {
                                                             const time = isObject ? (act as any).time : '';
 
                                                             return (
-                                                                <Badge key={i} variant="secondary" className="bg-surface text-xs gap-1.5 py-1.5 px-3.5">
+                                                                <Badge key={i} variant="secondary" className="bg-surface text-sm gap-1.5 py-2 px-3.5">
                                                                     {time && <span className="text-primary/70 font-mono uppercase tracking-tighter">{time}</span>}
                                                                     <span>{label}</span>
                                                                 </Badge>

@@ -10,6 +10,11 @@ const logSchema = new mongoose.Schema({
         type: String,
         required: true
     },
+    actionType: {
+        type: String,
+        enum: ['AUTH', 'BOOKING', 'CUSTOM_TRIP', 'AVAILABILITY', 'USER_MANAGEMENT', 'SYSTEM'],
+        default: 'SYSTEM'
+    },
     resource: {
         type: String,
         required: true
@@ -27,7 +32,17 @@ const logSchema = new mongoose.Schema({
         enum: ['info', 'success', 'warning', 'error'],
         default: 'info'
     },
-    ip: String
+    ip: String,
+    userAgent: String,
+    actorRole: {
+        type: String,
+        enum: ['admin', 'user', 'system'],
+        default: 'system'
+    },
+    metadata: {
+        type: mongoose.Schema.Types.Mixed,
+        default: {}
+    }
 }, {
     timestamps: true
 });

@@ -6,7 +6,7 @@ import Booking from '../models/bookingModel';
 import Destination from '../models/destinationModel';
 import Itinerary from '../models/itineraryModel';
 import { BookingStatus } from './bookingController';
-import Log from '../models/logModel';
+import { createAuditLog } from '../utils/auditLogger';
 
 // @desc Get all custom trip options
 // @route GET /api/custom-trips/options
@@ -57,6 +57,19 @@ export const createCustomTripOption = asyncHandler(async (req: Request, res: Res
         basePrice,
         imageUrl
     });
+
+    await createAuditLog({
+        user: (req as any).user?._id,
+        action: 'Created custom trip option',
+        actionType: 'CUSTOM_TRIP',
+        resource: 'CustomTripOption',
+        resourceId: String(option._id),
+        details: `${name} (${type}) option created`,
+        status: 'success',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: 'admin',
+    });
     res.status(201).json(option);
 });
 
@@ -69,6 +82,18 @@ export const updateCustomTripOption = asyncHandler(async (req: Request, res: Res
         res.status(404);
         throw new Error('Option not found');
     }
+    await createAuditLog({
+        user: (req as any).user?._id,
+        action: 'Updated custom trip option',
+        actionType: 'CUSTOM_TRIP',
+        resource: 'CustomTripOption',
+        resourceId: String(option._id),
+        details: `${option.name} option updated`,
+        status: 'info',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: 'admin',
+    });
     res.json(option);
 });
 
@@ -82,6 +107,19 @@ export const deleteCustomTripOption = asyncHandler(async (req: Request, res: Res
         throw new Error('Option not found');
     }
     await option.deleteOne();
+
+    await createAuditLog({
+        user: (req as any).user?._id,
+        action: 'Deleted custom trip option',
+        actionType: 'CUSTOM_TRIP',
+        resource: 'CustomTripOption',
+        resourceId: String(req.params.id),
+        details: `${option.name} option deleted`,
+        status: 'warning',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: 'admin',
+    });
     res.json({ message: 'Option removed' });
 });
 
@@ -89,7 +127,7 @@ export const deleteCustomTripOption = asyncHandler(async (req: Request, res: Res
 // @route POST /api/custom-trips/request
 // @access Private
 export const submitCustomTripRequest = asyncHandler(async (req: any, res: Response) => {
-    const { days, itinerary, notes, estimatedBudget, mode, templateName, pricingBreakdown, finalPrice } = req.body;
+    const { days, itinerary, notes, estimatedBudget, mode, templateName, pricingBreakdown, finalPrice, priceChangeReasons } = req.body;
     const normalizedItinerary = (itinerary || []).map((item: any, idx: number) => ({
         day: item.day || idx + 1,
         destination: item.destination || item.destinationId || undefined,
@@ -103,6 +141,8 @@ export const submitCustomTripRequest = asyncHandler(async (req: any, res: Respon
         user: req.user._id,
         days,
         itinerary: normalizedItinerary,
+        originalItinerary: normalizedItinerary,
+        reviewedItinerary: normalizedItinerary,
         notes,
         estimatedBudget,
         mode,
@@ -118,25 +158,40 @@ export const submitCustomTripRequest = asyncHandler(async (req: any, res: Respon
         customTrip: customTrip._id,
         numberOfPeople: 1, // Default, can be updated during pricing
         totalPrice: 0, // Admin will propose this
-        status: BookingStatus.SUBMITTED,
+        status: BookingStatus.UNDER_REVIEW,
         isRequest: true,
         paymentMethod: 'cash', // Placeholder
         notes: `Custom Trip Request: ${notes || 'See itinerary'}`,
+        estimateSnapshot: {
+            estimatedBudget,
+            finalPrice,
+            priceChangeReasons: Array.isArray(priceChangeReasons) ? priceChangeReasons : [],
+            pricingBreakdown: pricingBreakdown || {},
+        },
         history: [{
-            status: BookingStatus.SUBMITTED,
+            status: BookingStatus.UNDER_REVIEW,
             timestamp: new Date(),
             comment: 'Custom trip request submitted'
         }]
     });
 
     // Log action
-    await Log.create({
+    await createAuditLog({
         user: req.user._id,
         action: 'Submitted custom trip request',
+        actionType: 'CUSTOM_TRIP',
         resource: 'CustomTrip',
-        resourceId: customTrip._id,
+        resourceId: String(customTrip._id),
         details: `${days} days request submitted`,
-        status: 'success'
+        status: 'success',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: req.user?.role === 'admin' ? 'admin' : 'user',
+        metadata: {
+            bookingId: String(booking._id),
+            mode,
+            finalPrice,
+        },
     });
 
     res.status(201).json({ customTrip, booking });
@@ -146,7 +201,11 @@ export const submitCustomTripRequest = asyncHandler(async (req: any, res: Respon
 // @route GET /api/custom-trips/requests
 // @access Private/Admin
 export const getAllCustomTripRequests = asyncHandler(async (req: Request, res: Response) => {
-    const bookings = await Booking.find({ customTrip: { $exists: true } })
+    const bookings = await Booking.find({
+        customTrip: { $exists: true, $ne: null },
+        isRequest: true,
+        status: { $in: [BookingStatus.UNDER_REVIEW, BookingStatus.OFFER_SENT, BookingStatus.CONFIRMED, BookingStatus.REJECTED, BookingStatus.SUBMITTED, BookingStatus.OFFERED] }
+    })
         .populate('user', 'first_name last_name email')
         .populate({
             path: 'customTrip',

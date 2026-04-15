@@ -6,6 +6,7 @@ import { sendEmail } from '../utils/email';
 import { generateAccessToken, generateRefreshToken, verifyRefreshToken } from '../utils/tokenUtils';
 import logger from '../utils/logger';
 import redis from '../config/redis';
+import { createAuditLog } from '../utils/auditLogger';
 
 const COOKIE_OPTIONS = {
     httpOnly: true,
@@ -61,12 +62,37 @@ export const authUser = asyncHandler(async (req: Request, res: Response) => {
             role: user.role,
             verified: user.verified,
         });
+
+        await createAuditLog({
+            user: user._id,
+            action: 'User login successful',
+            actionType: 'AUTH',
+            resource: 'User',
+            resourceId: String(user._id),
+            details: `Login successful for ${user.email}`,
+            status: 'success',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: user.role === 'admin' ? 'admin' : 'user',
+        });
     } else {
         // Increment failed attempts
         const attempts = await redis.incr(`failedAtt:${email}`);
         if (attempts === 1) {
             await redis.expire(`failedAtt:${email}`, 900); // 15 mins
         }
+
+        await createAuditLog({
+            action: 'User login failed',
+            actionType: 'AUTH',
+            resource: 'User',
+            details: `Invalid login attempt for ${email}`,
+            status: 'warning',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: 'system',
+            metadata: { email, attempts },
+        });
 
         res.status(401);
         throw new Error('Invalid email or password');
@@ -167,6 +193,19 @@ export const registerUser = asyncHandler(async (req: any, res: any) => {
             email: user.email,
             message: 'Registration successful! Please verify your email.',
         });
+
+        await createAuditLog({
+            user: user._id,
+            action: 'User registered',
+            actionType: 'AUTH',
+            resource: 'User',
+            resourceId: String(user._id),
+            details: `New user registration for ${email}`,
+            status: 'success',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: role === 'admin' ? 'admin' : 'user',
+        });
     } else {
         res.status(400);
         throw new Error('Invalid user data');
@@ -187,6 +226,19 @@ export const logoutUser = asyncHandler(async (req: any, res: any) => {
     res.clearCookie('accessToken', COOKIE_OPTIONS);
     res.clearCookie('refreshToken', COOKIE_OPTIONS);
     res.status(200).json({ message: 'Logged out successfully' });
+
+    await createAuditLog({
+        user: req.user?._id,
+        action: 'User logout',
+        actionType: 'AUTH',
+        resource: 'User',
+        resourceId: req.user?._id ? String(req.user._id) : undefined,
+        details: 'User logged out',
+        status: 'info',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: req.user?.role === 'admin' ? 'admin' : 'user',
+    });
 });
 
 // ... other methods (getUserProfile, getAllUsers, etc.) will follow same pattern
@@ -214,6 +266,18 @@ export const getAllUsers = asyncHandler(async (req: any, res: any) => {
 export const deleteUser = asyncHandler(async (req: any, res: any) => {
     const user = await User.findByIdAndDelete(req.params.id);
     if (user) {
+        await createAuditLog({
+            user: req.user?._id,
+            action: 'Deleted user',
+            actionType: 'USER_MANAGEMENT',
+            resource: 'User',
+            resourceId: String(req.params.id),
+            details: `Deleted user ${user.email}`,
+            status: 'warning',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: 'admin',
+        });
         res.json({ message: 'User deleted' });
     } else {
         res.status(404);
@@ -234,6 +298,19 @@ export const verifyEmail = asyncHandler(async (req: any, res: any) => {
     user.verificationToken = undefined;
     await user.save();
 
+    await createAuditLog({
+        user: user._id,
+        action: 'Email verified',
+        actionType: 'AUTH',
+        resource: 'User',
+        resourceId: String(user._id),
+        details: `Email verification completed for ${user.email}`,
+        status: 'success',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: user.role === 'admin' ? 'admin' : 'user',
+    });
+
     res.json({ message: 'Email verified successfully' });
 });
 
@@ -253,6 +330,19 @@ export const updateProfile = asyncHandler(async (req: any, res: Response) => {
         }
 
         const updatedUser = await user.save();
+
+        await createAuditLog({
+            user: updatedUser._id,
+            action: 'Updated profile',
+            actionType: 'USER_MANAGEMENT',
+            resource: 'User',
+            resourceId: String(updatedUser._id),
+            details: `Profile updated for ${updatedUser.email}`,
+            status: 'info',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: updatedUser.role === 'admin' ? 'admin' : 'user',
+        });
 
         res.json({
             _id: updatedUser._id,
@@ -283,6 +373,19 @@ export const updateUser = asyncHandler(async (req: any, res: Response) => {
         user.role = req.body.role || user.role;
 
         const updatedUser = await user.save();
+
+        await createAuditLog({
+            user: req.user?._id,
+            action: 'Admin updated user',
+            actionType: 'USER_MANAGEMENT',
+            resource: 'User',
+            resourceId: String(updatedUser._id),
+            details: `Updated user ${updatedUser.email}`,
+            status: 'info',
+            ip: req.ip,
+            userAgent: req.get('user-agent'),
+            actorRole: 'admin',
+        });
 
         res.json({
             _id: updatedUser._id,

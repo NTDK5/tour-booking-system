@@ -1,9 +1,5 @@
-import { useState } from 'react';
 import {
-    History,
     Search,
-    Filter,
-    AlertCircle,
     CheckCircle,
     Info,
     User,
@@ -14,16 +10,43 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-
-const auditLogs = [
-    { id: "LOG-551", action: "UPDATE_AVAILABILITY", user: "sara_admin", target: "Guge Lodge", timestamp: "10 mins ago", status: "success", details: "Blocked dates March 12-15 for maintenance" },
-    { id: "LOG-550", action: "CREATE_BOOKING", user: "system_cron", target: "John Doe", timestamp: "1 hour ago", status: "success", details: "Auto-confirmed online booking BK-1002" },
-    { id: "LOG-549", action: "FAILED_LOGIN", user: "unknown_ip", target: "admin_panel", timestamp: "3 hours ago", status: "warning", details: "Failed login attempt from 192.168.1.1 (5 attempts)" },
-    { id: "LOG-548", action: "DELETE_RESOURCE", user: "abebe_super", target: "Old Car TR-09", timestamp: "5 hours ago", status: "success", details: "Manually removed retired vehicle from fleet" },
-    { id: "LOG-547", action: "EXPORT_DATA", user: "sara_admin", target: "Revenue_Report_Q1", timestamp: "1 day ago", status: "success", details: "Downloaded comprehensive financial report" },
-];
+import { useAdminLogs } from '@/hooks/useAdminLogs';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { useMemo, useState } from 'react';
+import { formatDistanceToNow } from 'date-fns';
 
 export default function AuditLogPage() {
+    const [search, setSearch] = useState('');
+    const { data: logs = [], isLoading, isError, refetch } = useAdminLogs();
+
+    const filteredLogs = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return logs;
+        return logs.filter((log: any) =>
+            String(log.action || '').toLowerCase().includes(q) ||
+            String(log.resource || '').toLowerCase().includes(q) ||
+            String(log.details || '').toLowerCase().includes(q) ||
+            String(log.user?.first_name || '').toLowerCase().includes(q) ||
+            String(log.user?.last_name || '').toLowerCase().includes(q) ||
+            String(log.user?.email || '').toLowerCase().includes(q)
+        );
+    }, [logs, search]);
+
+    if (isLoading) {
+        return (
+            <div className="space-y-4">
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+                <Skeleton className="h-24 w-full" />
+            </div>
+        );
+    }
+
+    if (isError) {
+        return <ErrorState onRetry={() => refetch()} />;
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -48,15 +71,17 @@ export default function AuditLogPage() {
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
-                            className="w-full h-10 pl-10 pr-4 rounded-lg bg-surface-dark border border-surface-border outline-none text-sm"
+                            className="w-full h-10 pl-10 pr-4 rounded-lg bg-surface-dark border border-surface-border outline-none text-sm text-white placeholder:text-neutral-500"
                             placeholder="Search logs by action, user, or target..."
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
                         />
                     </div>
                 </div>
 
                 <div className="divide-y divide-surface-border">
-                    {auditLogs.map((log) => (
-                        <div key={log.id} className="p-4 hover:bg-surface-dark/5 transition-colors flex flex-col md:flex-row gap-4">
+                    {filteredLogs.map((log: any) => (
+                        <div key={log._id} className="p-4 hover:bg-surface-dark/5 transition-colors flex flex-col md:flex-row gap-4">
                             <div className="flex items-start gap-4 flex-1">
                                 <div className={`p-2 rounded-lg mt-1 ${log.status === 'success' ? 'bg-success/10 text-success' :
                                     log.status === 'warning' ? 'bg-error/10 text-error' : 'bg-primary/10 text-primary'
@@ -70,23 +95,26 @@ export default function AuditLogPage() {
                                         <span className="text-muted-foreground">BY</span>
                                         <span className="flex items-center gap-1 text-foreground">
                                             <User size={12} className="text-muted-foreground" />
-                                            {log.user}
+                                            {log.user ? `${log.user.first_name || ''} ${log.user.last_name || ''}`.trim() || log.user.email : 'System'}
                                         </span>
                                         <span className="text-muted-foreground">ON</span>
-                                        <span className="text-foreground">{log.target}</span>
+                                        <span className="text-foreground">{log.resource}</span>
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">{log.details}</p>
                                 </div>
                             </div>
                             <div className="md:text-right flex flex-row md:flex-col items-center md:items-end justify-between md:justify-center gap-4">
-                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{log.id}</span>
+                                <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">{String(log._id).slice(-8).toUpperCase()}</span>
                                 <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                                     <Clock size={12} />
-                                    {log.timestamp}
+                                    {log.createdAt ? formatDistanceToNow(new Date(log.createdAt), { addSuffix: true }) : 'N/A'}
                                 </div>
                             </div>
                         </div>
                     ))}
+                    {filteredLogs.length === 0 && (
+                        <div className="p-8 text-center text-sm text-muted-foreground">No logs found for your search.</div>
+                    )}
                 </div>
 
                 <div className="p-4 border-t border-surface-border text-center">

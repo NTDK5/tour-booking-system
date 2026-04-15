@@ -8,6 +8,9 @@ import { Button } from '@/components/ui/Button';
 import { useCustomTripDestinations, useSubmitCustomTrip } from '@/hooks/useCustomTrips';
 import { Badge } from '@/components/ui/Badge';
 import { customTripsApi } from '@/api/customTrips';
+import { useAuth } from '@/providers/AuthProvider';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 interface CustomStep {
     id: number;
@@ -22,6 +25,8 @@ const STEPS: CustomStep[] = [
 ];
 
 export default function CustomTourBuilder({ onClose }: { onClose: () => void }) {
+    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
     const [currentStep, setCurrentStep] = useState(1);
     const [days, setDays] = useState(3);
     const [itinerary, setItinerary] = useState<any[]>([
@@ -76,6 +81,12 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
     const handleNext = () => {
         if (currentStep < 3) setCurrentStep(prev => prev + 1);
         else {
+            if (!isAuthenticated) {
+                toast.error('Please sign in to submit a custom trip request.');
+                onClose();
+                navigate('/auth/login');
+                return;
+            }
             submitRequest({
                 days,
                 itinerary,
@@ -91,7 +102,21 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
                     modeMultiplier,
                     subtotal,
                     finalTotal
-                }
+                },
+                priceChangeReasons,
+                estimateSnapshot: {
+                    estimatedBudget: finalTotal,
+                    finalPrice: finalTotal,
+                    pricingBreakdown: {
+                        basePerDay,
+                        daysCost,
+                        optionsCost: optionsCost + destinationCost,
+                        modeMultiplier,
+                        subtotal,
+                        finalTotal
+                    },
+                    priceChangeReasons
+                },
             }, {
                 onSuccess: () => onClose()
             });

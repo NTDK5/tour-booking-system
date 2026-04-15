@@ -42,7 +42,7 @@ export default function BookingManagementPage() {
         updateBooking.mutate({
             id: selectedBooking._id,
             payload: {
-                status: 'offered',
+                status: 'offer_sent',
                 proposedPrice: Number(proposedPrice)
             }
         }, {
@@ -178,8 +178,8 @@ export default function BookingManagementPage() {
                                     <td className="px-6 py-4 font-mono text-xs text-muted-foreground uppercase tracking-widest font-bold">
                                         <Badge variant={
                                             booking.status === 'confirmed' ? 'success' :
-                                                booking.status === 'offered' ? 'accent' :
-                                                    booking.status === 'submitted' ? 'warning' :
+                                                (booking.status === 'offered' || booking.status === 'offer_sent') ? 'accent' :
+                                                    (booking.status === 'submitted' || booking.status === 'under_review') ? 'warning' :
                                                         booking.status === 'pending' ? 'accent' : 'destructive'
                                         }>
                                             {booking.status}
@@ -188,7 +188,7 @@ export default function BookingManagementPage() {
                                     </td>
                                     <td className="px-6 py-4 text-right">
                                         <div className="flex items-center justify-end gap-1">
-                                            {booking.status === 'submitted' && (
+                                            {(booking.status === 'submitted' || booking.status === 'under_review') && (
                                                 <Button
                                                     variant="accent"
                                                     size="sm"

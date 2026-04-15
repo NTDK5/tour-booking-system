@@ -6,7 +6,11 @@ import {
     updateAvailability,
     createOfflineBooking,
     getReports,
-    getActivityLogs
+    getActivityLogs,
+    getResources,
+    syncResources,
+    getUnifiedCalendarBookings,
+    checkUnifiedResourceAvailability,
 } from '../controllers/adminController';
 
 const router = express.Router();
@@ -21,5 +25,9 @@ router.post('/availability', updateAvailability);
 router.post('/bookings/offline', createOfflineBooking);
 router.get('/reports', getReports);
 router.get('/logs', getActivityLogs);
+router.get('/resources', getResources);
+router.post('/resources/sync', syncResources);
+router.get('/calendar/bookings', getUnifiedCalendarBookings);
+router.post('/calendar/check-availability', checkUnifiedResourceAvailability);
 
 export default router;

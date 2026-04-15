@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-    Car as CarIcon,
     Plus,
     Edit,
     Trash2,
@@ -19,6 +18,7 @@ import { useCars, useCreateCar, useUpdateCar, useDeleteCar } from '@/hooks/useCa
 import { Skeleton } from '@/components/ui/Skeleton';
 import { CarFormModal } from '@/features/admin/CarFormModal';
 import type { Car } from '@/types';
+import { resolveImageUrl } from '@/utils/url';
 
 export default function CarManagementPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,8 +92,12 @@ export default function CarManagementPage() {
                     [...Array(4)].map((_, i) => <Skeleton key={i} className="h-[250px] rounded-2xl" />)
                 ) : cars?.map((car) => (
                     <div key={car._id} className="bg-surface-light border border-surface-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:border-primary/50 flex flex-col md:flex-row group">
-                        <div className="md:w-1/3 bg-surface-dark/40 flex items-center justify-center p-8 border-r border-surface-border relative overflow-hidden">
-                            <CarIcon size={64} className="text-muted-foreground opacity-20 group-hover:scale-110 group-hover:text-primary transition-all duration-500" />
+                        <div className="md:w-1/3 bg-surface-dark/40 flex items-center justify-center border-r border-surface-border relative overflow-hidden min-h-[220px]">
+                            <img
+                                src={resolveImageUrl(car.images?.[0] || '') || 'https://images.unsplash.com/photo-1594502184342-2e12f877aa73?auto=format&fit=crop&q=80&w=800'}
+                                alt={`${car.brand} ${car.model}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
+                            />
                             <div className="absolute top-4 left-4">
                                 <Badge variant={car.available ? 'success' : 'destructive'} className="uppercase text-[9px] font-black">
                                     {car.available ? 'Ready' : 'In Use'}

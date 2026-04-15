@@ -25,6 +25,21 @@ export const adminApi = {
         client.get('/admin/reports', { params }),
 
     getLogs: () => client.get('/admin/logs'),
+    getResources: (params?: { resourceType?: string; search?: string }) => client.get('/admin/resources', { params }),
+    syncResources: () => client.post('/admin/resources/sync'),
+    getUnifiedCalendarBookings: (params: {
+        start: string;
+        end: string;
+        resourceType?: string;
+        resourceId?: string;
+    }) => client.get('/admin/calendar/bookings', { params }),
+    checkUnifiedResourceAvailability: (data: {
+        resourceId: string;
+        resourceType: string;
+        startDate: string;
+        endDate: string;
+        excludeBookingId?: string;
+    }) => client.post('/admin/calendar/check-availability', data),
 
     getUsers: () => client.get('/users'),
     deleteUser: (id: string) => client.delete(`/users/${id}`),

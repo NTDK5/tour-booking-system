@@ -24,6 +24,21 @@ export const bookingSchema = z.object({
 });
 
 export const updateBookingSchema = z.object({
-    status: z.enum(['pending', 'confirmed', 'cancelled', 'completed']).optional(),
-    isPaid: z.boolean().optional(),
+    status: z.enum(['pending', 'under_review', 'offer_sent', 'confirmed', 'cancelled', 'expired', 'refunded', 'submitted', 'offered', 'accepted', 'rejected']).optional(),
+    proposedPrice: z.number().nonnegative().optional(),
+    notes: z.string().max(500).optional(),
+    comment: z.string().max(500).optional(),
+    offer: z.object({
+        finalPrice: z.number().nonnegative(),
+        currency: z.string().default('USD'),
+        adminNotes: z.string().max(1000).optional(),
+        validUntil: z.string().optional(),
+        breakdown: z.array(
+            z.object({
+                label: z.string(),
+                amount: z.number().nonnegative(),
+                reason: z.string().optional(),
+            })
+        ).optional(),
+    }).optional(),
 });

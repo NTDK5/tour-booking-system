@@ -87,7 +87,7 @@ export function LodgeFormModal({ lodge, onClose, onSave, isLoading }: LodgeFormM
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold uppercase text-muted-foreground">Description</label>
                         <textarea
-                            className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border outline-none min-h-[100px]"
+                            className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border outline-none min-h-[100px] text-white placeholder:text-neutral-500"
                             value={formData.description}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
                             placeholder="Describe the lodge, its vibe, and surroundings..."

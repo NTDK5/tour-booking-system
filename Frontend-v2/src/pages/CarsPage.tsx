@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
     Car, Fuel, Settings, Users,
@@ -14,8 +15,12 @@ import { useCars } from '@/hooks/useCars';
 import { useCreateBooking } from '@/hooks/useBookings';
 import RequestCarModal from '@/components/custom/RequestCarModal';
 import { resolveImageUrl } from '@/utils/url';
+import { useAuth } from '@/providers/AuthProvider';
+import toast from 'react-hot-toast';
 
 export default function CarsPage() {
+    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
     const { data: cars = [], isLoading, isError, refetch } = useCars();
     const normalizedCars = cars.map((car: any) => ({
         ...car,
@@ -39,6 +44,11 @@ export default function CarsPage() {
 
     const handleBooking = () => {
         if (!selectedCar) return;
+        if (!isAuthenticated) {
+            toast.error('Please sign in to continue with booking.');
+            navigate('/login');
+            return;
+        }
         createBooking({
             bookingType: 'car',
             carId: selectedCar._id,

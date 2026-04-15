@@ -8,12 +8,17 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { useCreateBooking } from '@/hooks/useBookings';
+import { useAuth } from '@/providers/AuthProvider';
+import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 interface RequestCarModalProps {
     onClose: () => void;
 }
 
 export default function RequestCarModal({ onClose }: RequestCarModalProps) {
+    const navigate = useNavigate();
+    const { isAuthenticated } = useAuth();
     const { mutate: createBooking, isPending } = useCreateBooking();
     const [formData, setFormData] = useState({
         carType: '',
@@ -26,6 +31,12 @@ export default function RequestCarModal({ onClose }: RequestCarModalProps) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (!isAuthenticated) {
+            toast.error('Please sign in to submit a custom car request.');
+            onClose();
+            navigate('/login');
+            return;
+        }
         createBooking({
             bookingType: 'car',
             customCarRequest: {

@@ -4,18 +4,26 @@ import {
     ChevronRight,
     Calendar as CalendarIcon,
     Filter,
-    Info,
     CheckCircle2,
     Hotel,
     Globe,
-    Car
+    Car,
+    RefreshCw
 } from 'lucide-react';
 import {
     format,
     addMonths,
     subMonths,
+    addWeeks,
+    subWeeks,
+    addDays,
+    subDays,
     startOfMonth,
     endOfMonth,
+    startOfDay,
+    endOfDay,
+    startOfWeek as startWeek,
+    endOfWeek as endWeek,
     startOfWeek,
     endOfWeek,
     eachDayOfInterval,
@@ -25,33 +33,58 @@ import {
 } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useAdminBookings } from '@/hooks/useAdminBookings';
+import { useResources, useSyncResources, useUnifiedCalendarBookings } from '@/hooks/useAdminCalendar';
 
 type ResourceType = 'Lodge' | 'Tour' | 'Car';
+type CalendarView = 'day' | 'week' | 'month';
 
 import { useAvailability } from '@/hooks/useAvailability';
 
 export default function AdminCalendar() {
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [calendarView, setCalendarView] = useState<CalendarView>('month');
     const [selectedType, setSelectedType] = useState<ResourceType>('Lodge');
+    const [selectedResourceId, setSelectedResourceId] = useState<string>('');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
     const [selectedDayBookings, setSelectedDayBookings] = useState<any[] | null>(null);
     const [selectedBookingDetail, setSelectedBookingDetail] = useState<any | null>(null);
+    const syncResources = useSyncResources();
+
+    const range = useMemo(() => {
+        if (calendarView === 'day') {
+            return { start: startOfDay(currentMonth), end: endOfDay(currentMonth) };
+        }
+        if (calendarView === 'week') {
+            return { start: startWeek(currentMonth), end: endWeek(currentMonth) };
+        }
+        return { start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) };
+    }, [calendarView, currentMonth]);
 
     // Generate calendar days
     const calendarDays = useMemo(() => {
-        const start = startOfWeek(startOfMonth(currentMonth));
-        const end = endOfWeek(endOfMonth(currentMonth));
+        const start = calendarView === 'month'
+            ? startOfWeek(startOfMonth(currentMonth))
+            : startWeek(range.start);
+        const end = calendarView === 'month'
+            ? endOfWeek(endOfMonth(currentMonth))
+            : endWeek(range.end);
         return eachDayOfInterval({ start, end });
-    }, [currentMonth]);
+    }, [calendarView, currentMonth, range.end, range.start]);
 
     // Fetch live availability
     const { data: availability = [], isLoading } = useAvailability({
-        start: startOfMonth(currentMonth).toISOString(),
-        end: endOfMonth(currentMonth).toISOString(),
-        resourceType: selectedType
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+        resourceType: selectedType,
+        resourceId: selectedResourceId || undefined,
     });
-    const { data: bookings = [] } = useAdminBookings();
+    const { data: resources = [] } = useResources({ resourceType: selectedType });
+    const { data: bookings = [], isLoading: bookingsLoading } = useUnifiedCalendarBookings({
+        start: range.start.toISOString(),
+        end: range.end.toISOString(),
+        resourceType: selectedType,
+        resourceId: selectedResourceId || undefined,
+    });
 
     const getDayContent = (day: Date) => {
         return availability.find((a: any) => isSameDay(new Date(a.date), day));
@@ -59,11 +92,14 @@ export default function AdminCalendar() {
 
     const getDayBookings = (day: Date) => {
         return (bookings || []).filter((booking: any) => {
-            const type = String(booking.bookingType || '').toLowerCase();
+            const type = String(booking?.resource?.resourceType || booking.bookingType || '').toLowerCase();
             const selected = selectedType.toLowerCase();
             if (type !== selected) return false;
-            const dateValue = booking.checkInDate || booking.bookingDate || booking.createdAt;
-            return dateValue ? isSameDay(new Date(dateValue), day) : false;
+            const start = booking.startDate || booking.checkInDate || booking.bookingDate || booking.createdAt;
+            const end = booking.endDate || booking.checkOutDate || start;
+            if (!start) return false;
+            const dayTime = startOfDay(day).getTime();
+            return new Date(start).getTime() <= dayTime && new Date(end).getTime() >= dayTime;
         });
     };
 
@@ -71,6 +107,19 @@ export default function AdminCalendar() {
         const content = getDayContent(day);
         const dayBookings = getDayBookings(day);
         const bookingCount = dayBookings.length;
+        // Group bookings by resource to detect same-resource overlap conflicts.
+        const resourceCounter = new Map<string, number>();
+        dayBookings.forEach((booking: any) => {
+            const resourceKey = String(
+                booking?.resource?.resourceId ||
+                booking?.tour?._id ||
+                booking?.lodge?._id ||
+                booking?.car?._id ||
+                'unknown'
+            );
+            resourceCounter.set(resourceKey, (resourceCounter.get(resourceKey) || 0) + 1);
+        });
+        const conflictCount = Array.from(resourceCounter.values()).filter((count) => count > 1).length;
 
         const isLodge = selectedType === 'Lodge';
         const isBlocked = content?.status === 'blocked' || content?.status === 'maintenance';
@@ -79,6 +128,10 @@ export default function AdminCalendar() {
             typeof content?.totalCapacity === 'number' &&
             content.totalCapacity > 0 &&
             content.bookedCapacity >= content.totalCapacity;
+        const highDemand = typeof content?.bookedCapacity === 'number' &&
+            typeof content?.totalCapacity === 'number' &&
+            content.totalCapacity > 0 &&
+            content.bookedCapacity / content.totalCapacity >= 0.8;
 
         const available = !(isBlocked || isFullyBooked || isCapacityFull);
         const label = isLodge
@@ -89,10 +142,10 @@ export default function AdminCalendar() {
             ? 'bg-success/10 text-success'
             : 'bg-error/10 text-error';
 
-        return { content, dayBookings, bookingCount, label, style };
+        return { content, dayBookings, bookingCount, label, style, conflictCount, highDemand };
     };
 
-    if (isLoading) {
+    if (isLoading || bookingsLoading) {
         return (
             <div className="min-h-[600px] flex items-center justify-center bg-surface">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -128,6 +181,20 @@ export default function AdminCalendar() {
                         </Button>
                     ))}
                 </div>
+
+                <div className="flex items-center gap-2 bg-surface-dark/50 p-1 rounded-xl">
+                    {(['day', 'week', 'month'] as CalendarView[]).map((view) => (
+                        <Button
+                            key={view}
+                            variant={calendarView === view ? 'primary' : 'ghost'}
+                            size="sm"
+                            onClick={() => setCalendarView(view)}
+                            className="capitalize"
+                        >
+                            {view}
+                        </Button>
+                    ))}
+                </div>
             </div>
 
             {/* Calendar Controls */}
@@ -137,11 +204,19 @@ export default function AdminCalendar() {
                         {format(currentMonth, 'MMMM yyyy')}
                     </h3>
                     <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCurrentMonth(calendarView === 'day' ? subDays(currentMonth, 1) : calendarView === 'week' ? subWeeks(currentMonth, 1) : subMonths(currentMonth, 1))}
+                        >
                             <ChevronLeft size={20} />
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setCurrentMonth(new Date())}>Today</Button>
-                        <Button variant="ghost" size="icon" onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setCurrentMonth(calendarView === 'day' ? addDays(currentMonth, 1) : calendarView === 'week' ? addWeeks(currentMonth, 1) : addMonths(currentMonth, 1))}
+                        >
                             <ChevronRight size={20} />
                         </Button>
                     </div>
@@ -152,11 +227,32 @@ export default function AdminCalendar() {
                         <Filter size={18} />
                         Resources
                     </Button>
+                    <Button variant="outline" className="gap-2" onClick={() => syncResources.mutate()} isLoading={syncResources.isPending}>
+                        <RefreshCw size={16} />
+                        Sync Resources
+                    </Button>
                     <Badge variant="success" className="gap-1">
                         <CheckCircle2 size={12} /> Live Sync
                     </Badge>
                 </div>
             </div>
+
+            {isFilterOpen && (
+                <div className="p-4 bg-surface-light border border-surface-border rounded-2xl flex flex-wrap gap-3">
+                    <select
+                        value={selectedResourceId}
+                        onChange={(e) => setSelectedResourceId(e.target.value)}
+                        className="bg-surface border border-surface-border rounded-xl px-4 py-2 text-white"
+                    >
+                        <option value="">All {selectedType} resources</option>
+                        {(resources || []).map((resource: any) => (
+                            <option key={resource._id} value={resource.sourceId || resource._id}>
+                                {resource.name}
+                            </option>
+                        ))}
+                    </select>
+                </div>
+            )}
 
             {/* Calendar Grid */}
             <div className="rounded-2xl bg-surface-light border border-surface-border shadow-sm overflow-hidden">
@@ -188,14 +284,22 @@ export default function AdminCalendar() {
                                     `}>
                                         {format(day, 'd')}
                                     </span>
-                                    {content && (
-                                        <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-surface-dark rounded-md text-muted-foreground">
-                                            <Info size={14} />
-                                        </button>
-                                    )}
+                                    <Badge variant="outline" className="text-[9px]">
+                                        {summary.bookingCount}
+                                    </Badge>
                                 </div>
 
                                 <div className="flex-grow flex flex-col gap-1 justify-end">
+                                    {summary.conflictCount > 0 && (
+                                        <div className="p-1 rounded-md bg-error/15 text-error text-[10px] font-bold text-center border border-error/30">
+                                            {summary.conflictCount} conflict{summary.conflictCount > 1 ? 's' : ''}
+                                        </div>
+                                    )}
+                                    {summary.highDemand && (
+                                        <div className="p-1 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-bold text-center border border-amber-400/30">
+                                            High Demand
+                                        </div>
+                                    )}
                                     {content ? (
                                         <div className={`
                                             p-2 rounded-lg text-[10px] font-bold uppercase tracking-tight flex flex-col items-center justify-center text-center leading-tight
@@ -244,6 +348,10 @@ export default function AdminCalendar() {
                 <div className="flex items-center gap-2">
                     <div className="w-3 h-3 rounded-full bg-amber-500"></div>
                     <span>Partially Booked</span>
+                </div>
+                <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full bg-error/70"></div>
+                    <span>Resource Conflict Detected</span>
                 </div>
             </div>
 

@@ -48,7 +48,7 @@ export default function UserManagementPage() {
                     <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                         <input
-                            className="w-full h-10 pl-10 pr-4 rounded-lg bg-surface-dark border border-surface-border outline-none text-sm"
+                            className="w-full h-10 pl-10 pr-4 rounded-lg bg-surface-dark border border-surface-border outline-none text-sm text-white placeholder:text-neutral-500"
                             placeholder="Search by name, email or ID..."
                         />
                     </div>

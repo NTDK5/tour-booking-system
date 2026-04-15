@@ -127,6 +127,31 @@ export interface Booking {
     paymentMethod?: string;
     notes?: string;
     proposedPrice?: number;
+    offer?: {
+        finalPrice: number;
+        currency?: string;
+        adminNotes?: string;
+        validUntil?: string;
+        basedOnEstimate?: number;
+        breakdown?: {
+            label: string;
+            amount: number;
+            reason?: string;
+        }[];
+    };
+    estimateSnapshot?: {
+        estimatedBudget?: number;
+        finalPrice?: number;
+        priceChangeReasons?: string[];
+        pricingBreakdown?: {
+            basePerDay?: number;
+            daysCost?: number;
+            optionsCost?: number;
+            modeMultiplier?: number;
+            subtotal?: number;
+            finalTotal?: number;
+        };
+    };
     isRequest?: boolean;
     customTrip?: string | {
         _id: string;
@@ -134,6 +159,13 @@ export interface Booking {
         estimatedBudget?: number;
         finalPrice?: number;
         itinerary?: any[];
+        reviewedItinerary?: any[];
+        changeSummary?: {
+            field: string;
+            previousValue?: string;
+            newValue?: string;
+            reason: string;
+        }[];
     };
     customCarRequest?: {
         carType: string;
@@ -147,7 +179,29 @@ export interface Booking {
     updatedAt: string;
 }
 
-export type BookingStatus = 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'submitted' | 'offered' | 'accepted' | 'rejected';
+export type BookingStatus =
+    | 'pending'
+    | 'under_review'
+    | 'offer_sent'
+    | 'confirmed'
+    | 'cancelled'
+    | 'completed'
+    | 'submitted'
+    | 'offered'
+    | 'accepted'
+    | 'rejected';
+
+export interface BookingTimelineEvent {
+    type: 'status' | 'audit';
+    status?: string;
+    action?: string;
+    actionType?: string;
+    details?: string;
+    actorRole?: 'admin' | 'user' | 'system';
+    comment?: string;
+    timestamp: string;
+    metadata?: Record<string, unknown>;
+}
 
 export interface TravelerDetails {
     firstName: string;

@@ -23,6 +23,28 @@ export interface ICustomTrip extends Document {
     };
     finalPrice?: number;
     notes?: string;
+    originalItinerary?: {
+        day: number;
+        destination?: mongoose.Types.ObjectId;
+        itineraryItem?: mongoose.Types.ObjectId;
+        options: mongoose.Types.ObjectId[];
+        notes?: string;
+    }[];
+    reviewedItinerary?: {
+        day: number;
+        destination?: mongoose.Types.ObjectId;
+        itineraryItem?: mongoose.Types.ObjectId;
+        options: mongoose.Types.ObjectId[];
+        notes?: string;
+    }[];
+    changeSummary?: {
+        field: string;
+        previousValue?: string;
+        newValue?: string;
+        reason: string;
+        changedBy?: mongoose.Types.ObjectId;
+        changedAt?: Date;
+    }[];
 }
 
 const customTripSchema: Schema<ICustomTrip> = new Schema(
@@ -49,6 +71,34 @@ const customTripSchema: Schema<ICustomTrip> = new Schema(
                     ref: 'CustomTripOption'
                 }],
                 notes: { type: String }
+            }
+        ],
+        originalItinerary: [
+            {
+                day: { type: Number, required: true },
+                destination: { type: Schema.Types.ObjectId, ref: 'Destination' },
+                itineraryItem: { type: Schema.Types.ObjectId, ref: 'Itinerary' },
+                options: [{ type: Schema.Types.ObjectId, ref: 'CustomTripOption' }],
+                notes: { type: String }
+            }
+        ],
+        reviewedItinerary: [
+            {
+                day: { type: Number, required: true },
+                destination: { type: Schema.Types.ObjectId, ref: 'Destination' },
+                itineraryItem: { type: Schema.Types.ObjectId, ref: 'Itinerary' },
+                options: [{ type: Schema.Types.ObjectId, ref: 'CustomTripOption' }],
+                notes: { type: String }
+            }
+        ],
+        changeSummary: [
+            {
+                field: { type: String, required: true },
+                previousValue: { type: String },
+                newValue: { type: String },
+                reason: { type: String, required: true },
+                changedBy: { type: Schema.Types.ObjectId, ref: 'User' },
+                changedAt: { type: Date, default: Date.now }
             }
         ],
         estimatedBudget: { type: Number },

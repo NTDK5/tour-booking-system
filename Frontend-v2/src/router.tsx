@@ -24,6 +24,7 @@ import LodgeDetailPage from '@/pages/LodgeDetailPage';
 import BookingPage from '@/pages/BookingPage';
 import ProfilePage from '@/features/dashboard/ProfilePage';
 import BookingHistoryPage from '@/features/dashboard/BookingHistoryPage';
+import CustomTripRequestDetailPage from '@/features/dashboard/CustomTripRequestDetailPage';
 import AboutPage from '@/pages/AboutPage';
 import GalleryPage from '@/pages/GalleryPage';
 import ContactPage from '@/pages/ContactPage';
@@ -73,6 +74,7 @@ export const router = createBrowserRouter([
         children: [
             { index: true, element: <ProfilePage /> },
             { path: 'bookings', element: <BookingHistoryPage /> },
+            { path: 'requests/:bookingId', element: <CustomTripRequestDetailPage /> },
             { path: 'profile', element: <ProfilePage /> },
         ],
     },

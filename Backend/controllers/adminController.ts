@@ -7,7 +7,10 @@ import Car from '../models/carModel';
 import Availability from '../models/availabilityModel';
 import User from '../models/userModel';
 import Log from '../models/logModel';
+import Resource from '../models/resourceModel';
+import { checkResourceAvailability, getBookingsForCalendarRange } from '../services/resourceAvailabilityService';
 import { startOfDay, endOfDay, subDays, format, startOfMonth, endOfMonth } from 'date-fns';
+import { createAuditLog } from '../utils/auditLogger';
 
 const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
 
@@ -166,6 +169,24 @@ export const updateAvailability = asyncHandler(async (req: Request, res: Respons
         { upsert: true, new: true }
     );
 
+    await createAuditLog({
+        user: (req as any).user?._id,
+        action: 'Updated availability',
+        actionType: 'AVAILABILITY',
+        resource: resourceType,
+        resourceId: String(resourceId),
+        details: `${resourceType} availability set to ${status} on ${format(startOfDay(parsedDate), 'yyyy-MM-dd')}`,
+        status: 'info',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: 'admin',
+        metadata: {
+            date: startOfDay(parsedDate),
+            notes,
+            totalCapacity: resolvedCapacity || 10,
+        },
+    });
+
     res.json(availability);
 });
 
@@ -243,13 +264,22 @@ export const createOfflineBooking = asyncHandler(async (req: Request, res: Respo
     res.status(201).json(booking);
 
     // Dynamic Log
-    await Log.create({
-        user: req.user?._id,
+    await createAuditLog({
+        user: (req as any).user?._id,
         action: 'Created offline booking',
+        actionType: 'BOOKING',
         resource: bookingType,
-        resourceId: booking._id,
+        resourceId: String(booking._id),
         details: `Guest: ${userName}, Total: $${totalPrice}`,
-        status: 'success'
+        status: 'success',
+        ip: req.ip,
+        userAgent: req.get('user-agent'),
+        actorRole: 'admin',
+        metadata: {
+            source: 'offline',
+            paymentMethod,
+            paymentStatus,
+        },
     });
 });
 
@@ -309,9 +339,153 @@ export const getReports = asyncHandler(async (req: Request, res: Response) => {
 // @route GET /api/admin/logs
 // @access Private/Admin
 export const getActivityLogs = asyncHandler(async (req: Request, res: Response) => {
-    const logs = await Log.find()
+    const { search, status, actionType, actorRole, resource, limit = '50' } = req.query as Record<string, string>;
+    const query: any = {};
+
+    if (status) query.status = status;
+    if (actionType) query.actionType = actionType;
+    if (actorRole) query.actorRole = actorRole;
+    if (resource) query.resource = resource;
+    if (search) {
+        query.$or = [
+            { action: { $regex: search, $options: 'i' } },
+            { details: { $regex: search, $options: 'i' } },
+            { resource: { $regex: search, $options: 'i' } },
+        ];
+    }
+
+    const safeLimit = Math.min(Math.max(parseInt(limit || '50', 10), 1), 200);
+    const logs = await Log.find(query)
         .sort({ createdAt: -1 })
-        .limit(20)
+        .limit(safeLimit)
         .populate('user', 'first_name last_name email');
     res.json(logs);
+});
+
+// @desc List unified resources
+// @route GET /api/admin/resources
+// @access Private/Admin
+export const getResources = asyncHandler(async (req: Request, res: Response) => {
+    const { resourceType, search } = req.query as Record<string, string>;
+    const query: any = { isActive: true };
+    if (resourceType) query.resourceType = resourceType;
+    if (search) query.name = { $regex: search, $options: 'i' };
+
+    const resources = await Resource.find(query).sort({ resourceType: 1, name: 1 });
+    res.json(resources);
+});
+
+// @desc Sync resources from existing domain models
+// @route POST /api/admin/resources/sync
+// @access Private/Admin
+export const syncResources = asyncHandler(async (_req: Request, res: Response) => {
+    const [lodges, tours, cars] = await Promise.all([
+        Lodge.find({}).lean(),
+        Tour.find({}).lean(),
+        Car.find({}).lean(),
+    ]);
+
+    const ops: any[] = [];
+    lodges.forEach((lodge: any) => {
+        ops.push({
+            updateOne: {
+                filter: { sourceModel: 'Lodge', sourceId: lodge._id },
+                update: {
+                    $set: {
+                        resourceType: 'Lodge',
+                        sourceModel: 'Lodge',
+                        sourceId: lodge._id,
+                        name: lodge.name,
+                        metadata: { location: lodge.location, roomTypes: lodge.roomTypes || [] },
+                        constraints: { maxCapacity: 20 },
+                        isActive: true,
+                    }
+                },
+                upsert: true,
+            }
+        });
+    });
+    tours.forEach((tour: any) => {
+        ops.push({
+            updateOne: {
+                filter: { sourceModel: 'Tour', sourceId: tour._id },
+                update: {
+                    $set: {
+                        resourceType: 'Tour',
+                        sourceModel: 'Tour',
+                        sourceId: tour._id,
+                        name: tour.title,
+                        metadata: { destination: tour.destination, duration: tour.duration },
+                        constraints: { maxCapacity: 20 },
+                        isActive: true,
+                    }
+                },
+                upsert: true,
+            }
+        });
+    });
+    cars.forEach((car: any) => {
+        ops.push({
+            updateOne: {
+                filter: { sourceModel: 'Car', sourceId: car._id },
+                update: {
+                    $set: {
+                        resourceType: 'Car',
+                        sourceModel: 'Car',
+                        sourceId: car._id,
+                        name: `${car.brand} ${car.carModel || car.model || ''}`.trim(),
+                        metadata: { location: car.location, seats: car.seats },
+                        constraints: { maxCapacity: 1 },
+                        isActive: Boolean(car.available),
+                    }
+                },
+                upsert: true,
+            }
+        });
+    });
+
+    if (ops.length) {
+        await Resource.bulkWrite(ops);
+    }
+
+    res.json({ message: 'Resources synced', total: ops.length });
+});
+
+// @desc Unified calendar bookings source
+// @route GET /api/admin/calendar/bookings
+// @access Private/Admin
+export const getUnifiedCalendarBookings = asyncHandler(async (req: Request, res: Response) => {
+    const { start, end, resourceType, resourceId } = req.query as Record<string, string>;
+    const startDate = parseDate(start);
+    const endDate = parseDate(end);
+
+    if (!startDate || !endDate) {
+        res.status(400);
+        throw new Error('Please provide valid start and end date');
+    }
+
+    const data = await getBookingsForCalendarRange(
+        { startDate, endDate },
+        { resourceType, resourceId }
+    );
+    res.json(data);
+});
+
+// @desc Check unified resource availability
+// @route POST /api/admin/calendar/check-availability
+// @access Private/Admin
+export const checkUnifiedResourceAvailability = asyncHandler(async (req: Request, res: Response) => {
+    const { resourceId, resourceType, startDate, endDate, excludeBookingId } = req.body;
+    if (!resourceId || !resourceType || !startDate || !endDate) {
+        res.status(400);
+        throw new Error('resourceId, resourceType, startDate, and endDate are required');
+    }
+
+    const result = await checkResourceAvailability(
+        { resourceId, resourceType },
+        { startDate: new Date(startDate), endDate: new Date(endDate) },
+        excludeBookingId
+    );
+
+    res.json(result);
 });

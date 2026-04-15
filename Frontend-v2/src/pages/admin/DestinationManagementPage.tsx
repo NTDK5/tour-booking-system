@@ -37,12 +37,12 @@ export default function DestinationManagementPage() {
             <div className="grid lg:grid-cols-2 gap-8">
                 <div className="bg-surface-light border border-surface-border rounded-2xl p-6 space-y-4">
                     <h3 className="font-bold text-lg">Create Destination</h3>
-                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" placeholder="Name" value={destinationForm.name} onChange={(e) => setDestinationForm({ ...destinationForm, name: e.target.value })} />
-                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" placeholder="Region" value={destinationForm.region} onChange={(e) => setDestinationForm({ ...destinationForm, region: e.target.value })} />
-                    <textarea className="w-full h-24 px-3 py-2 rounded-lg bg-surface border border-surface-border" placeholder="Description" value={destinationForm.description} onChange={(e) => setDestinationForm({ ...destinationForm, description: e.target.value })} />
+                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Name" value={destinationForm.name} onChange={(e) => setDestinationForm({ ...destinationForm, name: e.target.value })} />
+                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Region" value={destinationForm.region} onChange={(e) => setDestinationForm({ ...destinationForm, region: e.target.value })} />
+                    <textarea className="w-full h-24 px-3 py-2 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Description" value={destinationForm.description} onChange={(e) => setDestinationForm({ ...destinationForm, description: e.target.value })} />
                     <div className="grid grid-cols-2 gap-3">
-                        <input type="number" className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" placeholder="Base/day" value={destinationForm.basePricePerDay} onChange={(e) => setDestinationForm({ ...destinationForm, basePricePerDay: Number(e.target.value) })} />
-                        <input type="number" className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" placeholder="Transport" value={destinationForm.transportSurcharge} onChange={(e) => setDestinationForm({ ...destinationForm, transportSurcharge: Number(e.target.value) })} />
+                        <input type="number" className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Base/day" value={destinationForm.basePricePerDay} onChange={(e) => setDestinationForm({ ...destinationForm, basePricePerDay: Number(e.target.value) })} />
+                        <input type="number" className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Transport" value={destinationForm.transportSurcharge} onChange={(e) => setDestinationForm({ ...destinationForm, transportSurcharge: Number(e.target.value) })} />
                     </div>
                     <Button
                         onClick={() => createDestination.mutate(destinationForm)}
@@ -54,14 +54,14 @@ export default function DestinationManagementPage() {
 
                 <div className="bg-surface-light border border-surface-border rounded-2xl p-6 space-y-4">
                     <h3 className="font-bold text-lg">Create Activity</h3>
-                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" placeholder="Title" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
-                    <textarea className="w-full h-24 px-3 py-2 rounded-lg bg-surface border border-surface-border" placeholder="Description" value={activityForm.description} onChange={(e) => setActivityForm({ ...activityForm, description: e.target.value })} />
+                    <input className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Title" value={activityForm.title} onChange={(e) => setActivityForm({ ...activityForm, title: e.target.value })} />
+                    <textarea className="w-full h-24 px-3 py-2 rounded-lg bg-surface border border-surface-border text-white placeholder:text-neutral-500" placeholder="Description" value={activityForm.description} onChange={(e) => setActivityForm({ ...activityForm, description: e.target.value })} />
                     <div className="grid grid-cols-2 gap-3">
-                        <select className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" value={activityForm.destination} onChange={(e) => setActivityForm({ ...activityForm, destination: e.target.value })}>
+                        <select className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white" value={activityForm.destination} onChange={(e) => setActivityForm({ ...activityForm, destination: e.target.value })}>
                             <option value="">Select destination</option>
                             {destinations.map((d: any) => <option key={d._id} value={d._id}>{d.name}</option>)}
                         </select>
-                        <select className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border" value={activityForm.category} onChange={(e) => setActivityForm({ ...activityForm, category: e.target.value })}>
+                        <select className="w-full h-10 px-3 rounded-lg bg-surface border border-surface-border text-white" value={activityForm.category} onChange={(e) => setActivityForm({ ...activityForm, category: e.target.value })}>
                             <option value="culture">Culture</option>
                             <option value="nature">Nature</option>
                             <option value="adventure">Adventure</option>

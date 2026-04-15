@@ -20,14 +20,18 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useUserBookings } from '@/hooks/useBookings';
+import { useCancelBooking, useDeleteUserBooking } from '@/hooks/useBookings';
 import { useMyReviews, useCreateReview } from '@/hooks/useReviews';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { resolveImageUrl } from '@/utils/url';
+import { useNavigate } from 'react-router-dom';
 
 type Tab = 'profile' | 'bookings' | 'reviews';
 
 export default function ProfilePage() {
     const { user } = useAuth();
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<Tab>('profile');
     const [reviewingBooking, setReviewingBooking] = useState<any>(null);
 
@@ -74,7 +78,13 @@ export default function ProfilePage() {
                 {(['profile', 'bookings', 'reviews'] as Tab[]).map((tab) => (
                     <button
                         key={tab}
-                        onClick={() => setActiveTab(tab)}
+                        onClick={() => {
+                            if (tab === 'bookings') {
+                                navigate('/dashboard/bookings');
+                                return;
+                            }
+                            setActiveTab(tab);
+                        }}
                         className={`px-8 py-3 rounded-xl text-sm font-bold transition-all capitalize ${activeTab === tab
                                 ? 'bg-primary text-white shadow-glow'
                                 : 'text-neutral-500 hover:text-white hover:bg-white/5'
@@ -166,6 +176,12 @@ function ProfileSettings({ user }: { user: any }) {
 }
 
 function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], isLoading: boolean, onReview: (b: any) => void }) {
+    const customTripPlaceholder = 'https://images.unsplash.com/photo-1488646953014-85cb44e25828?auto=format&fit=crop&q=80&w=1200';
+    const navigate = useNavigate();
+    const cancelBooking = useCancelBooking();
+    const deleteBooking = useDeleteUserBooking();
+    const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
+
     if (isLoading) return <div className="space-y-4"><Skeleton className="h-32 w-full rounded-2xl" /><Skeleton className="h-32 w-full rounded-2xl" /></div>;
 
     if (!bookings || bookings.length === 0) {
@@ -178,13 +194,138 @@ function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], is
         );
     }
 
+    const getBookingKind = (booking: any) => {
+        if (booking.customTrip) return 'custom trip';
+        if (booking.customCarRequest) return 'custom car request';
+        if (booking.tour) return 'tour';
+        if (booking.lodge) return 'lodge';
+        if (booking.car) return 'car';
+        return String(booking.bookingType || 'booking').toLowerCase();
+    };
+
+    const getBookingTitle = (booking: any) => {
+        const customTripDays = typeof booking.customTrip === 'object' ? booking.customTrip?.days : undefined;
+        if (booking.tour?.title) return booking.tour.title;
+        if (booking.lodge?.name) return booking.lodge.name;
+        if (booking.car) return `${booking.car.brand} ${booking.car.model}`;
+        if (booking.customTrip) return customTripDays ? `Custom Trip (${customTripDays} days)` : 'Custom Trip Request';
+        if (booking.customCarRequest) return `${booking.customCarRequest.carType || 'Custom Car'} Request`;
+        return 'Booking';
+    };
+
+    const getBookingImage = (booking: any) => {
+        if (booking.customTrip) return customTripPlaceholder;
+        if (booking.tour?.images?.length) return booking.tour.images[0];
+        if (booking.tour?.imageUrl?.length) return booking.tour.imageUrl[0];
+        if (booking.lodge?.images?.length) return booking.lodge.images[0];
+        if (booking.car?.images?.length) return booking.car.images[0];
+        return '';
+    };
+
+    const getBookingDate = (booking: any) => {
+        const dateValue =
+            booking.checkInDate ||
+            booking.customCarRequest?.checkInDate ||
+            booking.startDate ||
+            booking.bookingDate ||
+            booking.createdAt;
+        if (!dateValue) return 'TBD';
+        const parsed = new Date(dateValue);
+        return Number.isNaN(parsed.getTime()) ? 'TBD' : format(parsed, 'MMM dd, yyyy');
+    };
+
+    const getCustomStatusLabel = (status?: string) => {
+        const normalized = String(status || '').toLowerCase();
+        if (normalized === 'submitted' || normalized === 'under_review') return 'Pending Review';
+        if (normalized === 'offered' || normalized === 'offer_sent') return 'Offer Sent';
+        if (normalized === 'accepted') return 'Accepted';
+        if (normalized === 'rejected') return 'Rejected';
+        if (normalized === 'confirmed') return 'Confirmed';
+        return normalized || 'Pending';
+    };
+
+    const customTripBookings = (bookings || []).filter((b: any) => Boolean(b.customTrip));
+
+    const handleCancel = (id: string) => {
+        if (window.confirm('Cancel this booking?')) {
+            cancelBooking.mutate(id);
+        }
+    };
+
+    const handleDelete = (id: string) => {
+        if (window.confirm('Delete this booking from your history?')) {
+            deleteBooking.mutate(id);
+        }
+    };
+
     return (
         <div className="space-y-4">
+            {customTripBookings.length > 0 && (
+                <div className="bg-surface-light border border-surface-border rounded-3xl p-6 space-y-4">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-bold text-white">Custom Trip Requests</h3>
+                        <Badge variant="accent">{customTripBookings.length}</Badge>
+                    </div>
+                    <div className="space-y-3">
+                        {customTripBookings.map((booking: any) => {
+                            const trip = typeof booking.customTrip === 'object' ? booking.customTrip : null;
+                            const itinerary = trip?.reviewedItinerary || trip?.itinerary || [];
+                            const destinationNames = itinerary
+                                .map((item: any) => item?.destination?.name)
+                                .filter(Boolean)
+                                .slice(0, 3);
+                            const estimate = booking.estimateSnapshot?.finalPrice || booking.estimateSnapshot?.estimatedBudget || trip?.estimatedBudget || 0;
+                            const offered = booking.offer?.finalPrice || booking.proposedPrice || 0;
+
+                            return (
+                                <button
+                                    type="button"
+                                    key={`custom-${booking._id}`}
+                                    className="w-full rounded-2xl border border-surface-border bg-surface p-4 text-left hover:border-primary/40 transition-colors"
+                                    onClick={() => navigate(`/dashboard/requests/${booking._id}`)}
+                                >
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div>
+                                            <p className="text-sm font-bold text-white">
+                                                {trip?.days || 0} Days {destinationNames.length ? `- ${destinationNames.join(', ')}` : '- Custom Plan'}
+                                            </p>
+                                            <p className="text-xs text-neutral-500 mt-1">
+                                                Submitted {format(new Date(booking.createdAt), 'MMM dd, yyyy')}
+                                            </p>
+                                        </div>
+                                        <Badge variant={booking.status === 'confirmed' ? 'success' : (booking.status === 'offered' || booking.status === 'offer_sent') ? 'warning' : 'outline'}>
+                                            {getCustomStatusLabel(booking.status)}
+                                        </Badge>
+                                    </div>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-4 text-xs">
+                                        <div>
+                                            <p className="text-neutral-500 uppercase">Estimated</p>
+                                            <p className="text-white font-bold">${estimate || 0}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-neutral-500 uppercase">Final Offer</p>
+                                            <p className="text-primary font-bold">{offered ? `$${offered}` : 'Pending'}</p>
+                                        </div>
+                                        <div>
+                                            <p className="text-neutral-500 uppercase">Status</p>
+                                            <p className="text-white font-bold">{getCustomStatusLabel(booking.status)}</p>
+                                        </div>
+                                        <div className="flex items-end">
+                                            <span className="text-primary font-bold">Open Details</span>
+                                        </div>
+                                    </div>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
             {bookings.map((booking: any) => (
                 <div key={booking._id} className="group bg-surface-light border border-surface-border rounded-3xl p-6 transition-all hover:border-primary/30 flex flex-col md:flex-row gap-6">
                     <div className="w-full md:w-48 h-32 rounded-2xl overflow-hidden shrink-0">
                         <img
-                            src={booking.tour?.images?.[0] || booking.lodge?.images?.[0] || booking.car?.images?.[0] || 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&q=80&w=600'}
+                            src={resolveImageUrl(getBookingImage(booking)) || 'https://images.unsplash.com/photo-1547471080-7cc2caa01a7e?auto=format&fit=crop&q=80&w=600'}
                             alt="Service"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                         />
@@ -193,10 +334,10 @@ function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], is
                         <div className="flex justify-between items-start">
                             <div>
                                 <Badge variant="secondary" className="mb-2 uppercase text-[9px] tracking-tighter">
-                                    {booking.bookingType}
+                                    {getBookingKind(booking)}
                                 </Badge>
                                 <h4 className="text-xl font-bold text-white group-hover:text-primary transition-colors">
-                                    {booking.tour?.title || booking.lodge?.name || (booking.car ? `${booking.car.brand} ${booking.car.model}` : 'Booking')}
+                                    {getBookingTitle(booking)}
                                 </h4>
                             </div>
                             <Badge variant={booking.status === 'confirmed' ? 'success' : 'outline'}>
@@ -206,7 +347,7 @@ function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], is
                         <div className="flex flex-wrap gap-6 mt-4">
                             <div className="flex items-center gap-2 text-xs text-neutral-400">
                                 <Calendar className="w-4 h-4 text-primary" />
-                                {format(new Date(booking.startDate || booking.bookingDate || booking.createdAt), 'MMM dd, yyyy')}
+                                {getBookingDate(booking)}
                             </div>
                             <div className="flex items-center gap-2 text-sm font-bold text-white ml-auto">
                                 Total: ${booking.totalPrice}
@@ -214,7 +355,11 @@ function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], is
                         </div>
                     </div>
                     <div className="flex flex-col gap-2 justify-center">
-                        <Button variant="outline" size="sm" className="rounded-xl">View Details</Button>
+                        <Button variant="outline" size="sm" className="rounded-xl" onClick={() => setSelectedBooking(booking)}>View Details</Button>
+                        {booking.status !== 'cancelled' && (
+                            <Button variant="outline" size="sm" className="rounded-xl" onClick={() => handleCancel(booking._id)} isLoading={cancelBooking.isPending}>Cancel</Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="rounded-xl text-error" onClick={() => handleDelete(booking._id)} isLoading={deleteBooking.isPending}>Delete</Button>
                         {booking.status === 'confirmed' && (
                             <Button
                                 variant="primary"
@@ -229,6 +374,45 @@ function BookingHistory({ bookings, isLoading, onReview }: { bookings: any[], is
                     </div>
                 </div>
             ))}
+
+            {selectedBooking && (
+                <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
+                    <div className="w-full max-w-xl bg-surface-light border border-surface-border rounded-2xl p-6 space-y-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-xl font-bold text-white">Booking Details</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedBooking(null)}>Close</Button>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4 text-sm">
+                            <div><span className="text-neutral-500">Booking ID</span><p className="font-bold">#{selectedBooking._id.slice(-8).toUpperCase()}</p></div>
+                            <div><span className="text-neutral-500">Status</span><p className="font-bold uppercase">{selectedBooking.status}</p></div>
+                            <div><span className="text-neutral-500">Type</span><p className="font-bold uppercase">{getBookingKind(selectedBooking)}</p></div>
+                            <div><span className="text-neutral-500">Total Price</span><p className="font-bold">{selectedBooking.totalPrice > 0 ? `$${selectedBooking.totalPrice}` : 'TBD'}</p></div>
+                            <div><span className="text-neutral-500">Start</span><p className="font-bold">{selectedBooking.checkInDate || selectedBooking.bookingDate || 'N/A'}</p></div>
+                            <div><span className="text-neutral-500">End</span><p className="font-bold">{selectedBooking.checkOutDate || 'N/A'}</p></div>
+                        </div>
+                        {selectedBooking.customCarRequest && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold">Custom Car Request</p>
+                                <p className="text-sm mt-1">Type: {selectedBooking.customCarRequest.carType || '-'}</p>
+                                <p className="text-sm mt-1">Capacity: {selectedBooking.customCarRequest.passengerCapacity || '-'}</p>
+                            </div>
+                        )}
+                        {selectedBooking.customTrip && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold">Custom Trip</p>
+                                <p className="text-sm mt-1">Days: {typeof selectedBooking.customTrip === 'string' ? '-' : (selectedBooking.customTrip.days || 0)}</p>
+                                <p className="text-sm mt-1">Final Price: {typeof selectedBooking.customTrip === 'string' ? '-' : (selectedBooking.customTrip.finalPrice ? `$${selectedBooking.customTrip.finalPrice}` : 'TBD')}</p>
+                            </div>
+                        )}
+                        {selectedBooking.notes && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold">Notes</p>
+                                <p className="text-sm mt-1">{selectedBooking.notes}</p>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

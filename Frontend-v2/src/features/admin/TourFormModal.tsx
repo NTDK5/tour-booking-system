@@ -96,7 +96,7 @@ export function TourFormModal({ tour, onClose, onSave, isLoading }: TourFormModa
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Difficulty</label>
                             <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
                                 value={formData.difficulty}
                                 onChange={e => setFormData({ ...formData, difficulty: e.target.value as any })}
                             >
@@ -110,7 +110,7 @@ export function TourFormModal({ tour, onClose, onSave, isLoading }: TourFormModa
                     <div className="space-y-1.5">
                         <label className="text-xs font-bold uppercase text-muted-foreground">Description</label>
                         <textarea
-                            className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border outline-none min-h-[100px]"
+                            className="w-full p-4 rounded-xl bg-surface-dark border border-surface-border outline-none min-h-[100px] text-white placeholder:text-neutral-500"
                             value={formData.description}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
                             placeholder="Detailed tour itinerary and information..."

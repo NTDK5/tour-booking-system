@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/Badge';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useCustomTripOptions, useCustomTripRequests, useCreateTripOption } from '@/hooks/useCustomTrips';
 import { useUpdateBooking } from '@/hooks/useAdminBookings';
+import { bookingsApi } from '@/api/bookings';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -17,6 +18,7 @@ export default function CustomTripManagementPage() {
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [detailRequest, setDetailRequest] = useState<any>(null);
     const [proposedPrice, setProposedPrice] = useState('');
+    const [adminNotes, setAdminNotes] = useState('');
 
     const { data: options = [], isLoading: optionsLoading } = useCustomTripOptions();
     const { data: requests = [], isLoading: requestsLoading } = useCustomTripRequests();
@@ -41,15 +43,32 @@ export default function CustomTripManagementPage() {
         updateBooking.mutate({
             id: bookingId,
             payload: {
-                status: 'offered',
-                proposedPrice: Number(proposedPrice)
+                status: 'offer_sent',
+                proposedPrice: Number(proposedPrice),
+                offer: {
+                    finalPrice: Number(proposedPrice),
+                    currency: 'USD',
+                    adminNotes,
+                    breakdown: [],
+                },
+                comment: adminNotes || 'Offer sent by admin',
             }
         }, {
             onSuccess: () => {
                 setSelectedRequest(null);
                 setProposedPrice('');
+                setAdminNotes('');
             }
         });
+    };
+
+    const handleConfirmAccepted = async (bookingId: string) => {
+        try {
+            await bookingsApi.confirmRequest(bookingId, 'Reservation confirmed without payment.');
+            toast.success('Request confirmed and reserved.');
+        } catch (error: any) {
+            toast.error(error?.response?.data?.message || 'Failed to confirm request.');
+        }
     };
 
     return (
@@ -127,13 +146,22 @@ export default function CustomTripManagementPage() {
                             </div>
 
                             <div className="flex flex-col gap-3 min-w-[200px]">
-                                {req.booking?.status === 'submitted' && (
+                                {(req.booking?.status === 'submitted' || req.booking?.status === 'under_review') && (
                                     <Button
                                         variant="accent"
                                         className="w-full rounded-2xl font-bold italic"
                                         onClick={() => setSelectedRequest(req)}
                                     >
                                         Propose Price
+                                    </Button>
+                                )}
+                                {(req.booking?.status === 'accepted' || req.booking?.status === 'confirmed') && (
+                                    <Button
+                                        variant="accent"
+                                        className="w-full rounded-2xl font-bold"
+                                        onClick={() => handleConfirmAccepted(req.booking?._id)}
+                                    >
+                                        Confirm Reservation
                                     </Button>
                                 )}
                                 <Button variant="outline" className="w-full rounded-2xl" onClick={() => setDetailRequest(req)}>
@@ -219,6 +247,16 @@ export default function CustomTripManagementPage() {
                                         autoFocus
                                     />
                                 </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-neutral-500 ml-1">Offer Notes / Changes</label>
+                                <textarea
+                                    className="w-full rounded-2xl bg-surface-dark border border-surface-border p-3 text-sm text-white outline-none focus:ring-2 focus:ring-primary"
+                                    rows={3}
+                                    placeholder="Explain itinerary updates or pricing adjustments..."
+                                    value={adminNotes}
+                                    onChange={(e) => setAdminNotes(e.target.value)}
+                                />
                             </div>
                         </div>
 

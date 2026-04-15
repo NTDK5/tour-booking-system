@@ -31,6 +31,8 @@ export function useUpdateBooking() {
             apiClient.put(`/bookings/${id}`, payload),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+            queryClient.invalidateQueries({ queryKey: ['customTripRequests'] });
+            queryClient.invalidateQueries({ queryKey: ['bookings', 'user'] });
             toast.success('Booking updated');
         },
         onError: (error: any) => {

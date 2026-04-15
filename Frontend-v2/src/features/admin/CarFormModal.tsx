@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Save, Car as CarIcon } from 'lucide-react';
+import { X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import type { Car } from '@/types';
@@ -104,7 +104,7 @@ export function CarFormModal({ car, onClose, onSave, isLoading }: CarFormModalPr
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Transmission</label>
                             <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
                                 value={formData.transmission}
                                 onChange={e => setFormData({ ...formData, transmission: e.target.value as any })}
                             >
@@ -115,7 +115,7 @@ export function CarFormModal({ car, onClose, onSave, isLoading }: CarFormModalPr
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Fuel Type</label>
                             <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
                                 value={formData.fuelType}
                                 onChange={e => setFormData({ ...formData, fuelType: e.target.value as any })}
                             >
