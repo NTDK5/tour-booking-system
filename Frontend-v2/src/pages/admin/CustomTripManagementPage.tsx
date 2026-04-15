@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     Plus, Search, Edit, Trash2, Globe,
     Sparkles, MapPin, Info, CheckCircle2,
@@ -10,6 +10,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { useCustomTripOptions, useCustomTripRequests, useCreateTripOption } from '@/hooks/useCustomTrips';
 import { useUpdateBooking } from '@/hooks/useAdminBookings';
 import { bookingsApi } from '@/api/bookings';
+import { activitiesApi } from '@/api/activities';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -17,12 +18,74 @@ export default function CustomTripManagementPage() {
     const [activeTab, setActiveTab] = useState<'options' | 'requests'>('requests');
     const [selectedRequest, setSelectedRequest] = useState<any>(null);
     const [detailRequest, setDetailRequest] = useState<any>(null);
+    const [destinationActivitiesMap, setDestinationActivitiesMap] = useState<Record<string, any[]>>({});
     const [proposedPrice, setProposedPrice] = useState('');
     const [adminNotes, setAdminNotes] = useState('');
 
     const { data: options = [], isLoading: optionsLoading } = useCustomTripOptions();
     const { data: requests = [], isLoading: requestsLoading } = useCustomTripRequests();
     const updateBooking = useUpdateBooking();
+
+    const resolveItineraryToShow = (request: any) => {
+        if (Array.isArray(request?.reviewedItinerary) && request.reviewedItinerary.length > 0) {
+            return request.reviewedItinerary;
+        }
+        if (Array.isArray(request?.itinerary) && request.itinerary.length > 0) {
+            return request.itinerary;
+        }
+        if (Array.isArray(request?.originalItinerary) && request.originalItinerary.length > 0) {
+            return request.originalItinerary;
+        }
+        return [];
+    };
+
+    const getActivityLabel = (activity: any) => {
+        if (!activity) return 'Activity';
+        if (typeof activity === 'string') return activity;
+        return activity.title || activity.name || activity.label || 'Activity';
+    };
+
+    useEffect(() => {
+        let active = true;
+        const loadDestinationActivities = async () => {
+            if (!detailRequest) {
+                setDestinationActivitiesMap({});
+                return;
+            }
+            const itinerary = resolveItineraryToShow(detailRequest);
+            const destinationIds = Array.from(new Set(
+                itinerary
+                    .map((day: any) => day?.destination?._id || day?.destinationId || day?.destination)
+                    .filter(Boolean)
+                    .map((id: any) => String(id))
+            ));
+
+            if (!destinationIds.length) {
+                setDestinationActivitiesMap({});
+                return;
+            }
+
+            const entries = await Promise.all(
+                destinationIds.map(async (destinationId) => {
+                    try {
+                        const activities = await activitiesApi.getAll(destinationId);
+                        return [destinationId, activities || []] as const;
+                    } catch {
+                        return [destinationId, []] as const;
+                    }
+                })
+            );
+
+            if (active) {
+                setDestinationActivitiesMap(Object.fromEntries(entries));
+            }
+        };
+
+        loadDestinationActivities();
+        return () => {
+            active = false;
+        };
+    }, [detailRequest]);
 
     const handleProposePrice = async () => {
         if (!proposedPrice || isNaN(Number(proposedPrice))) {
@@ -329,30 +392,59 @@ export default function CustomTripManagementPage() {
 
                         <div className="space-y-4">
                             <h4 className="text-sm font-bold uppercase tracking-widest text-neutral-400">Itinerary Details</h4>
-                            {(detailRequest.itinerary || []).length === 0 ? (
+                            {resolveItineraryToShow(detailRequest).length === 0 ? (
                                 <p className="text-sm text-neutral-500">No itinerary details submitted.</p>
                             ) : (
-                                (detailRequest.itinerary || []).map((day: any, idx: number) => (
+                                resolveItineraryToShow(detailRequest).map((day: any, idx: number) => (
                                     <div key={idx} className="p-4 rounded-2xl bg-surface border border-surface-border space-y-2">
                                         <div className="flex items-center justify-between">
                                             <p className="font-bold text-white">Day {day.day || idx + 1}</p>
                                             <Badge variant="outline">
-                                                {day.destination?.name || day.destinationId || 'Destination not set'}
+                                                {day.destination?.name || day.destination?.title || day.destinationId || day.destination || 'Destination not set'}
                                             </Badge>
                                         </div>
+                                        {day.tripDate && (
+                                            <p className="text-sm text-neutral-400">
+                                                Date: {format(new Date(day.tripDate), 'dd MMM yyyy')}
+                                            </p>
+                                        )}
                                         <p className="text-sm text-neutral-400">
                                             Itinerary: {day.itineraryItem?.title || day.itineraryItemId || 'No itinerary package selected'}
                                         </p>
                                         {day.itineraryItem?.price !== undefined && (
                                             <p className="text-sm text-primary font-bold">Itinerary Price: ${day.itineraryItem.price}</p>
                                         )}
-                                        {(day.itineraryItem?.activities || []).length > 0 && (
+                                        {((day.activities || []).length > 0 || (day.itineraryItem?.activities || []).length > 0) && (
                                             <div>
                                                 <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Activities</p>
                                                 <div className="flex flex-wrap gap-2">
-                                                    {day.itineraryItem.activities.map((act: any, aIdx: number) => (
-                                                        <Badge key={aIdx} variant="secondary">{act.title || 'Activity'}</Badge>
+                                                    {(day.activities || []).map((act: any, aIdx: number) => (
+                                                        <Badge key={`direct-${aIdx}`} variant="secondary">{getActivityLabel(act)}</Badge>
                                                     ))}
+                                                    {(day.itineraryItem?.activities || []).map((act: any, aIdx: number) => (
+                                                        <Badge key={`itinerary-${aIdx}`} variant="secondary">{getActivityLabel(act)}</Badge>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                        {(day.activities || []).length === 0 && (day.itineraryItem?.activities || []).length === 0 && (
+                                            <div>
+                                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Destination Activities (Fallback)</p>
+                                                <div className="flex flex-wrap gap-2">
+                                                    {(
+                                                        destinationActivitiesMap[
+                                                            String(day.destination?._id || day.destinationId || day.destination || '')
+                                                        ] || []
+                                                    ).map((act: any, aIdx: number) => (
+                                                        <Badge key={`fallback-${aIdx}`} variant="secondary">{getActivityLabel(act)}</Badge>
+                                                    ))}
+                                                    {(
+                                                        destinationActivitiesMap[
+                                                            String(day.destination?._id || day.destinationId || day.destination || '')
+                                                        ] || []
+                                                    ).length === 0 && (
+                                                        <span className="text-xs text-neutral-500">No activities found for this destination.</span>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

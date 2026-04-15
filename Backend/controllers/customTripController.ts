@@ -130,8 +130,10 @@ export const submitCustomTripRequest = asyncHandler(async (req: any, res: Respon
     const { days, itinerary, notes, estimatedBudget, mode, templateName, pricingBreakdown, finalPrice, priceChangeReasons } = req.body;
     const normalizedItinerary = (itinerary || []).map((item: any, idx: number) => ({
         day: item.day || idx + 1,
+        tripDate: item.tripDate || undefined,
         destination: item.destination || item.destinationId || undefined,
         itineraryItem: item.itineraryItem || item.itineraryItemId || undefined,
+        activities: item.activities || item.activityIds || [],
         options: item.options || [],
         notes: item.notes || ''
     }));
@@ -211,8 +213,17 @@ export const getAllCustomTripRequests = asyncHandler(async (req: Request, res: R
             path: 'customTrip',
             populate: [
                 { path: 'itinerary.options', model: 'CustomTripOption' },
+                { path: 'itinerary.activities', model: 'Activity' },
                 { path: 'itinerary.destination', model: 'Destination' },
-                { path: 'itinerary.itineraryItem', model: 'Itinerary' }
+                { path: 'itinerary.itineraryItem', populate: [{ path: 'activities', model: 'Activity' }] },
+                { path: 'originalItinerary.options', model: 'CustomTripOption' },
+                { path: 'originalItinerary.activities', model: 'Activity' },
+                { path: 'originalItinerary.destination', model: 'Destination' },
+                { path: 'originalItinerary.itineraryItem', populate: [{ path: 'activities', model: 'Activity' }] },
+                { path: 'reviewedItinerary.options', model: 'CustomTripOption' },
+                { path: 'reviewedItinerary.activities', model: 'Activity' },
+                { path: 'reviewedItinerary.destination', model: 'Destination' },
+                { path: 'reviewedItinerary.itineraryItem', populate: [{ path: 'activities', model: 'Activity' }] }
             ]
         })
         .sort({ createdAt: -1 });
@@ -226,6 +237,9 @@ export const getAllCustomTripRequests = asyncHandler(async (req: Request, res: R
                 user: booking.user,
                 days: trip.days,
                 itinerary: trip.itinerary,
+                originalItinerary: trip.originalItinerary,
+                reviewedItinerary: trip.reviewedItinerary,
+                changeSummary: trip.changeSummary,
                 notes: trip.notes,
                 estimatedBudget: trip.estimatedBudget,
                 mode: trip.mode,

@@ -5,8 +5,10 @@ export interface ICustomTrip extends Document {
     days: number;
     itinerary: {
         day: number;
+        tripDate?: Date;
         destination?: mongoose.Types.ObjectId;
         itineraryItem?: mongoose.Types.ObjectId;
+        activities: mongoose.Types.ObjectId[];
         options: mongoose.Types.ObjectId[];
         notes?: string;
     }[];
@@ -25,15 +27,19 @@ export interface ICustomTrip extends Document {
     notes?: string;
     originalItinerary?: {
         day: number;
+        tripDate?: Date;
         destination?: mongoose.Types.ObjectId;
         itineraryItem?: mongoose.Types.ObjectId;
+        activities: mongoose.Types.ObjectId[];
         options: mongoose.Types.ObjectId[];
         notes?: string;
     }[];
     reviewedItinerary?: {
         day: number;
+        tripDate?: Date;
         destination?: mongoose.Types.ObjectId;
         itineraryItem?: mongoose.Types.ObjectId;
+        activities: mongoose.Types.ObjectId[];
         options: mongoose.Types.ObjectId[];
         notes?: string;
     }[];
@@ -58,6 +64,7 @@ const customTripSchema: Schema<ICustomTrip> = new Schema(
         itinerary: [
             {
                 day: { type: Number, required: true },
+                tripDate: { type: Date },
                 destination: {
                     type: Schema.Types.ObjectId,
                     ref: 'Destination'
@@ -66,6 +73,10 @@ const customTripSchema: Schema<ICustomTrip> = new Schema(
                     type: Schema.Types.ObjectId,
                     ref: 'Itinerary'
                 },
+                activities: [{
+                    type: Schema.Types.ObjectId,
+                    ref: 'Activity'
+                }],
                 options: [{
                     type: Schema.Types.ObjectId,
                     ref: 'CustomTripOption'
@@ -76,8 +87,10 @@ const customTripSchema: Schema<ICustomTrip> = new Schema(
         originalItinerary: [
             {
                 day: { type: Number, required: true },
+                tripDate: { type: Date },
                 destination: { type: Schema.Types.ObjectId, ref: 'Destination' },
                 itineraryItem: { type: Schema.Types.ObjectId, ref: 'Itinerary' },
+                activities: [{ type: Schema.Types.ObjectId, ref: 'Activity' }],
                 options: [{ type: Schema.Types.ObjectId, ref: 'CustomTripOption' }],
                 notes: { type: String }
             }
@@ -85,8 +98,10 @@ const customTripSchema: Schema<ICustomTrip> = new Schema(
         reviewedItinerary: [
             {
                 day: { type: Number, required: true },
+                tripDate: { type: Date },
                 destination: { type: Schema.Types.ObjectId, ref: 'Destination' },
                 itineraryItem: { type: Schema.Types.ObjectId, ref: 'Itinerary' },
+                activities: [{ type: Schema.Types.ObjectId, ref: 'Activity' }],
                 options: [{ type: Schema.Types.ObjectId, ref: 'CustomTripOption' }],
                 notes: { type: String }
             }

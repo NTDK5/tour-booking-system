@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { useCustomTripDestinations, useSubmitCustomTrip } from '@/hooks/useCustomTrips';
 import { Badge } from '@/components/ui/Badge';
 import { customTripsApi } from '@/api/customTrips';
+import { activitiesApi } from '@/api/activities';
 import { useAuth } from '@/providers/AuthProvider';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -30,15 +31,16 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
     const [currentStep, setCurrentStep] = useState(1);
     const [days, setDays] = useState(3);
     const [itinerary, setItinerary] = useState<any[]>([
-        { day: 1, destinationId: '', itineraryItemId: '', notes: '' },
-        { day: 2, destinationId: '', itineraryItemId: '', notes: '' },
-        { day: 3, destinationId: '', itineraryItemId: '', notes: '' }
+        { day: 1, tripDate: '', destinationId: '', itineraryItemId: '', activityIds: [], notes: '' },
+        { day: 2, tripDate: '', destinationId: '', itineraryItemId: '', activityIds: [], notes: '' },
+        { day: 3, tripDate: '', destinationId: '', itineraryItemId: '', activityIds: [], notes: '' }
     ]);
     const [notes, setNotes] = useState('');
     const [mode, setMode] = useState<'budget' | 'premium'>('budget');
     const [templateName, setTemplateName] = useState('');
 
     const [itineraryOptionsByDestination, setItineraryOptionsByDestination] = useState<Record<string, any[]>>({});
+    const [activitiesByDestination, setActivitiesByDestination] = useState<Record<string, any[]>>({});
     const { data: destinations = [] } = useCustomTripDestinations();
     const { mutate: submitRequest, isPending } = useSubmitCustomTrip();
 
@@ -81,6 +83,18 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
     const handleNext = () => {
         if (currentStep < 3) setCurrentStep(prev => prev + 1);
         else {
+            const hasMissingTimeline = itinerary.some((day) => !day.tripDate);
+            if (hasMissingTimeline) {
+                toast.error(`Please select all ${days} trip day dates from the calendar inputs.`);
+                setCurrentStep(2);
+                return;
+            }
+            const hasMissingDestination = itinerary.some((day) => !day.destinationId);
+            if (hasMissingDestination) {
+                toast.error('Please select a destination for each trip day.');
+                setCurrentStep(2);
+                return;
+            }
             if (!isAuthenticated) {
                 toast.error('Please sign in to submit a custom trip request.');
                 onClose();
@@ -133,6 +147,7 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
             ...newItinerary[dayIndex],
             destinationId,
             itineraryItemId: '',
+            activityIds: [],
             _options: []
         };
         setItinerary(newItinerary);
@@ -144,6 +159,38 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
                 setItineraryOptionsByDestination((prev) => ({ ...prev, [destinationId]: [] }));
             }
         }
+        if (destinationId && !activitiesByDestination[destinationId]) {
+            try {
+                const activities = await activitiesApi.getAll(destinationId);
+                setActivitiesByDestination((prev) => ({ ...prev, [destinationId]: activities || [] }));
+            } catch {
+                setActivitiesByDestination((prev) => ({ ...prev, [destinationId]: [] }));
+            }
+        }
+    };
+
+    const setDayDate = (dayIndex: number, tripDate: string) => {
+        const newItinerary = [...itinerary];
+        newItinerary[dayIndex] = {
+            ...newItinerary[dayIndex],
+            tripDate
+        };
+        setItinerary(newItinerary);
+    };
+
+    const toggleDayActivity = (dayIndex: number, activityId: string) => {
+        const newItinerary = [...itinerary];
+        const selected = new Set<string>(newItinerary[dayIndex].activityIds || []);
+        if (selected.has(activityId)) {
+            selected.delete(activityId);
+        } else {
+            selected.add(activityId);
+        }
+        newItinerary[dayIndex] = {
+            ...newItinerary[dayIndex],
+            activityIds: Array.from(selected)
+        };
+        setItinerary(newItinerary);
     };
 
     const setDayItineraryOption = (dayIndex: number, option: any) => {
@@ -163,8 +210,10 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
 
         const generated = Array.from({ length: days }, (_, i) => ({
             day: i + 1,
+            tripDate: '',
             destinationId: destinationIds[i % Math.max(destinationIds.length, 1)] || '',
             itineraryItemId: '',
+            activityIds: [],
             notes: `${template} - Day ${i + 1}`
         }));
         setItinerary(generated);
@@ -230,7 +279,7 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
                                         value={days} onChange={(e) => {
                                             const d = Number(e.target.value);
                                             setDays(d);
-                                            setItinerary(Array.from({ length: d }, (_, i) => ({ day: i + 1, destinationId: '', itineraryItemId: '', notes: '' })));
+                                            setItinerary(Array.from({ length: d }, (_, i) => ({ day: i + 1, tripDate: '', destinationId: '', itineraryItemId: '', activityIds: [], notes: '' })));
                                         }}
                                         className="w-full accent-primary h-2 bg-neutral-800 rounded-lg appearance-none cursor-pointer"
                                     />
@@ -296,6 +345,15 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
                                             <div className="h-[1px] flex-1 bg-surface-border"></div>
                                         </div>
                                         <div className="space-y-4">
+                                            <div>
+                                                <label className="text-[10px] uppercase font-bold tracking-widest text-neutral-500">Trip Day Date</label>
+                                                <input
+                                                    type="date"
+                                                    value={day.tripDate || ''}
+                                                    onChange={(e) => setDayDate(dIdx, e.target.value)}
+                                                    className="mt-2 w-full bg-surface border border-surface-border rounded-xl px-4 py-3 text-white outline-none focus:border-primary"
+                                                />
+                                            </div>
                                             <select
                                                 value={day.destinationId}
                                                 onChange={(e) => setDayDestination(dIdx, e.target.value)}
@@ -310,22 +368,54 @@ export default function CustomTourBuilder({ onClose }: { onClose: () => void }) 
                                             </select>
 
                                             {day.destinationId && (
-                                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                                    {(itineraryOptionsByDestination[day.destinationId] || []).map((opt: any) => (
-                                                        <div
-                                                            key={opt._id}
-                                                            onClick={() => setDayItineraryOption(dIdx, opt)}
-                                                            className={`p-4 rounded-[24px] border transition-all cursor-pointer group ${day.itineraryItemId === opt._id ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-surface-border bg-surface hover:border-primary/30'}`}
-                                                        >
-                                                            <div className="flex items-start justify-between mb-3">
-                                                                <Badge variant="outline" className="uppercase tracking-widest text-[8px]">{opt.dayType}</Badge>
-                                                                {day.itineraryItemId === opt._id && <CheckCircle2 className="w-4 h-4 text-primary" />}
-                                                            </div>
-                                                            <h4 className="text-white font-bold mb-1">{opt.title}</h4>
-                                                            <p className="text-[10px] text-neutral-500 line-clamp-2">{opt.summary}</p>
-                                                            <p className="text-xs text-primary mt-3 font-bold">${opt.price}</p>
+                                                <div className="space-y-6">
+                                                    <div>
+                                                        <div className="text-[10px] uppercase font-bold tracking-widest text-neutral-500 mb-2">
+                                                            Select Itinerary Option
                                                         </div>
-                                                    ))}
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                            {(itineraryOptionsByDestination[day.destinationId] || []).map((opt: any) => (
+                                                                <div
+                                                                    key={opt._id}
+                                                                    onClick={() => setDayItineraryOption(dIdx, opt)}
+                                                                    className={`p-4 rounded-[24px] border transition-all cursor-pointer group ${day.itineraryItemId === opt._id ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-surface-border bg-surface hover:border-primary/30'}`}
+                                                                >
+                                                                    <div className="flex items-start justify-between mb-3">
+                                                                        <Badge variant="outline" className="uppercase tracking-widest text-[8px]">{opt.dayType}</Badge>
+                                                                        {day.itineraryItemId === opt._id && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                                                                    </div>
+                                                                    <h4 className="text-white font-bold mb-1">{opt.title}</h4>
+                                                                    <p className="text-[10px] text-neutral-500 line-clamp-2">{opt.summary}</p>
+                                                                    <p className="text-xs text-primary mt-3 font-bold">${opt.price}</p>
+                                                                </div>
+                                                            ))}
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <div className="text-[10px] uppercase font-bold tracking-widest text-neutral-500 mb-2">
+                                                            Select Activities For This Destination
+                                                        </div>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                                            {(activitiesByDestination[day.destinationId] || []).map((activity: any) => {
+                                                                const isSelected = (day.activityIds || []).includes(activity._id);
+                                                                return (
+                                                                    <button
+                                                                        key={activity._id}
+                                                                        type="button"
+                                                                        onClick={() => toggleDayActivity(dIdx, activity._id)}
+                                                                        className={`text-left p-4 rounded-2xl border transition-all ${isSelected ? 'border-primary bg-primary/5 ring-1 ring-primary/20' : 'border-surface-border bg-surface hover:border-primary/30'}`}
+                                                                    >
+                                                                        <div className="flex items-center justify-between mb-2">
+                                                                            <p className="text-sm font-bold text-white">{activity.title}</p>
+                                                                            {isSelected && <CheckCircle2 className="w-4 h-4 text-primary" />}
+                                                                        </div>
+                                                                        <p className="text-[10px] text-neutral-500 capitalize">{activity.category} · {activity.duration}</p>
+                                                                    </button>
+                                                                );
+                                                            })}
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

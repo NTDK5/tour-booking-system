@@ -22,15 +22,73 @@ const normalizeRange = ({ startDate, endDate }: DateRange) => {
     };
 };
 
-export const buildOverlapQuery = (resource: ResourceRef, range: DateRange, excludeBookingId?: string) => {
+const getLegacyResourceField = (resourceType: ResourceRef['resourceType']) => {
+    if (resourceType === 'Lodge') return 'lodge';
+    if (resourceType === 'Tour') return 'tour';
+    if (resourceType === 'Car') return 'car';
+    return null;
+};
+
+const buildDateOverlapQuery = (range: DateRange) => {
     const normalized = normalizeRange(range);
-    const query: any = {
-        'resource.resourceId': resource.resourceId,
-        'resource.resourceType': resource.resourceType,
-        status: { $in: ACTIVE_BOOKING_STATUSES },
-        startDate: { $lte: normalized.end },
-        endDate: { $gte: normalized.start },
+    return {
+        $or: [
+            // New unified date fields
+            {
+                startDate: { $lte: normalized.end },
+                endDate: { $gte: normalized.start },
+            },
+            // Legacy lodge/car date fields
+            {
+                checkInDate: { $lte: normalized.end },
+                checkOutDate: { $gte: normalized.start },
+            },
+            // Legacy single-date bookings (tour, etc.)
+            {
+                bookingDate: { $gte: normalized.start, $lte: normalized.end },
+            },
+            // Extra fallback to creation date for very old records
+            {
+                createdAt: { $gte: normalized.start, $lte: normalized.end },
+            },
+        ],
     };
+};
+
+const buildResourceQuery = (filters?: { resourceType?: string; resourceId?: string }) => {
+    if (!filters?.resourceType && !filters?.resourceId) return {};
+
+    const clauses: any[] = [];
+
+    if (filters.resourceType) {
+        clauses.push({ 'resource.resourceType': filters.resourceType });
+        clauses.push({ bookingType: filters.resourceType });
+    }
+
+    if (filters.resourceId) {
+        clauses.push({ 'resource.resourceId': filters.resourceId });
+        if (filters.resourceType) {
+            const legacyField = getLegacyResourceField(filters.resourceType as ResourceRef['resourceType']);
+            if (legacyField) clauses.push({ [legacyField]: filters.resourceId });
+        }
+    }
+
+    if (!clauses.length) return {};
+    return { $or: clauses };
+};
+
+export const buildOverlapQuery = (resource: ResourceRef, range: DateRange, excludeBookingId?: string) => {
+    const resourceQuery = buildResourceQuery({
+        resourceType: resource.resourceType,
+        resourceId: resource.resourceId,
+    });
+    const dateOverlapQuery = buildDateOverlapQuery(range);
+    const query: any = {
+        status: { $in: ACTIVE_BOOKING_STATUSES },
+        ...dateOverlapQuery,
+        ...resourceQuery,
+    };
+
     if (excludeBookingId) {
         query._id = { $ne: excludeBookingId };
     }
@@ -47,13 +105,10 @@ export const checkResourceAvailability = async (resource: ResourceRef, range: Da
 };
 
 export const getBookingsForCalendarRange = async (range: DateRange, filters?: { resourceType?: string; resourceId?: string }) => {
-    const normalized = normalizeRange(range);
     const query: any = {
-        startDate: { $lte: normalized.end },
-        endDate: { $gte: normalized.start },
+        ...buildDateOverlapQuery(range),
+        ...buildResourceQuery(filters),
     };
-    if (filters?.resourceType) query['resource.resourceType'] = filters.resourceType;
-    if (filters?.resourceId) query['resource.resourceId'] = filters.resourceId;
 
     return Booking.find(query)
         .populate('user', 'first_name last_name email')
