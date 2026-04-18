@@ -6,7 +6,10 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "start": "ts-node server.ts",
-    "dev": "ts-node-dev server.ts"
+    "dev": "ts-node-dev server.ts",
+    "migrate:tours": "ts-node modules/migration/migrateToursToPackages.ts",
+    "seed": "ts-node seeds/runSeed.ts",
+    "seed:force": "ts-node seeds/runSeed.ts --force"
   },
   "keywords": [],
   "author": "",

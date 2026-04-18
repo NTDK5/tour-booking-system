@@ -4,6 +4,16 @@ export const bookingSchema = z.object({
     bookingType: z.enum(['tour', 'lodge', 'car']),
     tour: z.string().optional(),
     tourId: z.string().optional(),
+    departureId: z.string().optional(),
+    children: z.number().int().min(0).optional(),
+    selectedAddons: z
+        .array(
+            z.union([
+                z.string(),
+                z.object({ name: z.string(), price: z.number().nonnegative().optional() }),
+            ])
+        )
+        .optional(),
     lodge: z.string().optional(),
     lodgeId: z.string().optional(),
     car: z.string().optional(),

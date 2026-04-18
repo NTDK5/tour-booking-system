@@ -1,32 +1,28 @@
+/**
+ * Legacy alias — reads use public `/packages`; writes use `/admin/packages`.
+ */
 import { apiClient } from '@/api/client';
+import { packagesApi, adminPackagesApi } from '@/api/packages';
 import type { Tour, PaginatedResponse, TourFilters } from '@/types';
 
 export const toursApi = {
-    getAll: async (filters?: TourFilters): Promise<PaginatedResponse<Tour>> => {
-        const { data } = await apiClient.get('/tours', { params: filters });
-        // Normalize backend response (backend returns array, we wrap for consistency)
-        if (Array.isArray(data)) {
-            return { data, total: data.length, page: 1, limit: data.length, totalPages: 1 };
-        }
-        return data;
-    },
+    getAll: (filters?: TourFilters): Promise<PaginatedResponse<Tour>> => packagesApi.getAll(filters),
 
-    async getById(id: string): Promise<Tour> {
-        const { data } = await apiClient.get(`/tours/${id}`);
-        return data;
-    },
+    getById: (id: string): Promise<Tour> => packagesApi.getById(id),
 
     async create(payload: Partial<Tour>): Promise<Tour> {
-        const { data } = await apiClient.post('/tours', payload);
+        const { data } = await apiClient.post('/admin/packages', payload);
         return data;
     },
 
     async update(id: string, payload: Partial<Tour>): Promise<Tour> {
-        const { data } = await apiClient.put(`/tours/${id}`, payload);
+        const { data } = await apiClient.put(`/admin/packages/${id}`, payload);
         return data;
     },
 
     async delete(id: string): Promise<void> {
-        await apiClient.delete(`/tours/${id}`);
+        await adminPackagesApi.remove(id);
     },
 };
+
+export { packagesApi, adminPackagesApi };

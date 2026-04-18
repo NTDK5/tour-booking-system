@@ -1,5 +1,6 @@
 import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware';
+import adminPackageRoutes from './adminPackageRoutes';
 import {
     getDashboardStats,
     getAvailability,
@@ -29,5 +30,8 @@ router.get('/resources', getResources);
 router.post('/resources/sync', syncResources);
 router.get('/calendar/bookings', getUnifiedCalendarBookings);
 router.post('/calendar/check-availability', checkUnifiedResourceAvailability);
+
+/** Tour / package builder API — GET/POST/PATCH `/api/admin/packages`, etc. */
+router.use('/packages', adminPackageRoutes);
 
 export default router;

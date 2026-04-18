@@ -25,6 +25,7 @@ export interface Tour {
     title: string;
     description: string;
     shortDescription?: string;
+    fullDescription?: string;
     destination: string;
     duration: number; // days
     groupSize: number;

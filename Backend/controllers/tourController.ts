@@ -1,63 +1,38 @@
 import { Request, Response } from 'express';
 import asyncHandler from 'express-async-handler';
 import Tour from '../models/tourModel';
+import { mapTourToPublicDto, normalizePackagePayload } from '../modules/packages/compat/packageDto';
+import { buildTourListFilter, listToursPaginated } from '../modules/packages/services/packageQueryService';
 
-// @desc Get all tours (with optional filters)
+// @desc Get all tours / packages (optional filters)
 // @route GET /api/tours
 export const getTours = asyncHandler(async (req: Request, res: Response) => {
     const {
         featured,
         limit = 20,
         page = 1,
-        category,
-        destination,
-        days,
-        duration,
-        difficulty,
-        minPrice,
-        maxPrice,
         sort = '-averageRating',
-        search,
     } = req.query;
 
     const limitNum = Math.min(Number(limit), 100);
     const pageNum = Math.max(Number(page), 1);
     const skip = (pageNum - 1) * limitNum;
 
-    // Build filter query
-    const filter: Record<string, any> = {};
+    const filter = buildTourListFilter(req.query as any, { publicCatalog: true });
 
-    if (category) filter.category = category;
-    if (destination) filter.destination = { $regex: destination, $options: 'i' };
-    if (days || duration) filter.duration = Number(days || duration);
-    if (difficulty) filter.difficulty = difficulty;
-    if (minPrice || maxPrice) {
-        filter.price = {};
-        if (minPrice) filter.price.$gte = Number(minPrice);
-        if (maxPrice) filter.price.$lte = Number(maxPrice);
-    }
-    if (search) {
-        filter.$or = [
-            { title: { $regex: search, $options: 'i' } },
-            { destination: { $regex: search, $options: 'i' } },
-            { description: { $regex: search, $options: 'i' } },
-        ];
-    }
-
-    // Handle featured: if featured=true, try to find featured tours first,
-    // fall back to top-rated tours so the homepage is never empty
     if (featured === 'true') {
         const featuredFilter = { ...filter, featured: true };
         const featuredCount = await Tour.countDocuments(featuredFilter);
 
         if (featuredCount > 0) {
-            const tours = await Tour.find(featuredFilter)
-                .sort(sort as string)
-                .skip(skip)
-                .limit(limitNum);
-            const total = await Tour.countDocuments(featuredFilter);
+            const { data, total } = await listToursPaginated({
+                filter: featuredFilter,
+                sort: sort as string,
+                skip,
+                limit: limitNum,
+            });
             res.json({
-                data: tours,
+                data: data.map(mapTourToPublicDto),
                 total,
                 page: pageNum,
                 limit: limitNum,
@@ -66,14 +41,14 @@ export const getTours = asyncHandler(async (req: Request, res: Response) => {
             return;
         }
 
-        // Fallback: return top-rated / most recent tours
-        const tours = await Tour.find(filter)
-            .sort('-averageRating -totalRatings -createdAt')
-            .skip(skip)
-            .limit(limitNum);
-        const total = await Tour.countDocuments(filter);
+        const { data, total } = await listToursPaginated({
+            filter,
+            sort: '-averageRating -totalRatings -createdAt',
+            skip,
+            limit: limitNum,
+        });
         res.json({
-            data: tours,
+            data: data.map(mapTourToPublicDto),
             total,
             page: pageNum,
             limit: limitNum,
@@ -82,14 +57,15 @@ export const getTours = asyncHandler(async (req: Request, res: Response) => {
         return;
     }
 
-    // Normal query
-    const [tours, total] = await Promise.all([
-        Tour.find(filter).sort(sort as string).skip(skip).limit(limitNum),
-        Tour.countDocuments(filter),
-    ]);
+    const { data, total } = await listToursPaginated({
+        filter,
+        sort: sort as string,
+        skip,
+        limit: limitNum,
+    });
 
     res.json({
-        data: tours,
+        data: data.map(mapTourToPublicDto),
         total,
         page: pageNum,
         limit: limitNum,
@@ -97,43 +73,43 @@ export const getTours = asyncHandler(async (req: Request, res: Response) => {
     });
 });
 
-// @desc Get tour by ID
+// @desc Get tour / package by ID (public DTO)
 // @route GET /api/tours/:id
 export const getTourById = asyncHandler(async (req: Request, res: Response) => {
     const tour = await Tour.findById(req.params.id);
     if (tour) {
-        res.json(tour);
+        res.json(mapTourToPublicDto(tour));
     } else {
         res.status(404);
         throw new Error('Tour not found');
     }
 });
 
-// @desc Create a tour
+// @desc Create a tour / package
 // @route POST /api/tours
 // @access Private/Admin
 export const createTour = asyncHandler(async (req: Request, res: Response) => {
-    const tour = new Tour(req.body);
+    const tour = new Tour(normalizePackagePayload(req.body as any));
     const createdTour = await tour.save();
-    res.status(201).json(createdTour);
+    res.status(201).json(mapTourToPublicDto(createdTour));
 });
 
-// @desc Update a tour
+// @desc Update a tour / package
 // @route PUT /api/tours/:id
 // @access Private/Admin
 export const updateTour = asyncHandler(async (req: Request, res: Response) => {
     const tour = await Tour.findById(req.params.id);
     if (tour) {
-        Object.assign(tour, req.body);
+        Object.assign(tour, normalizePackagePayload(req.body as any));
         const updatedTour = await tour.save();
-        res.json(updatedTour);
+        res.json(mapTourToPublicDto(updatedTour));
     } else {
         res.status(404);
         throw new Error('Tour not found');
     }
 });
 
-// @desc Delete a tour
+// @desc Delete a tour / package
 // @route DELETE /api/tours/:id
 // @access Private/Admin
 export const deleteTour = asyncHandler(async (req: Request, res: Response) => {

@@ -1,16 +1,8 @@
 import { z } from 'zod';
+import { tourPackageCreateSchema } from '../modules/packages/validators/packageSchemas';
 
-export const tourSchema = z.object({
-    name: z.string().min(3, 'Name must be at least 3 characters'),
-    description: z.string().min(10, 'Description must be at least 10 characters'),
-    price: z.number().positive('Price must be a positive number'),
-    duration: z.string(),
-    maxGroupSize: z.number().int().positive(),
-    difficulty: z.enum(['Easy', 'Medium', 'Hard']),
-    category: z.string(),
-    images: z.array(z.string()).optional(),
-    startLocation: z.string().optional(),
-});
+/** Tour / package create — aligned with TourPackage model (`title`, not legacy `name`). */
+export const tourSchema = tourPackageCreateSchema;
 
 export const lodgeSchema = z.object({
     name: z.string().min(3),

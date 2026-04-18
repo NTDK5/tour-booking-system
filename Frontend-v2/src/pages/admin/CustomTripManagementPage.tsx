@@ -53,12 +53,14 @@ export default function CustomTripManagementPage() {
                 return;
             }
             const itinerary = resolveItineraryToShow(detailRequest);
-            const destinationIds = Array.from(new Set(
-                itinerary
-                    .map((day: any) => day?.destination?._id || day?.destinationId || day?.destination)
-                    .filter(Boolean)
-                    .map((id: any) => String(id))
-            ));
+            const destinationIds: string[] = Array.from(
+                new Set(
+                    itinerary
+                        .map((day: any) => day?.destination?._id || day?.destinationId || day?.destination)
+                        .filter(Boolean)
+                        .map((id: any) => String(id))
+                )
+            );
 
             if (!destinationIds.length) {
                 setDestinationActivitiesMap({});

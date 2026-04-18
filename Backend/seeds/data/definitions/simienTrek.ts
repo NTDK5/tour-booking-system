@@ -1,0 +1,203 @@
+import { IMG } from '../mediaAssets';
+import { activity, itineraryDay } from '../itineraryHelpers';
+
+export const simienTrekPackage = {
+    schemaVersion: 2,
+    packageCode: 'ETH-SIMIEN-10D',
+    title: 'Simien Mountains Trekking Expedition — Escarpments & Gelada Highlands',
+    slug: 'simien-mountains-trekking-expedition-gelada-highlands',
+    shortDescription:
+        'Ten-day trekking immersion along UNESCO-listed escarpments: Afro-alpine meadows, gelada baboon study sessions, lodge-to-camp pacing with full mountaineering support and medical-grade acclimatization protocols.',
+    fullDescription: `Designed for active travelers seeking altitude without technical climbing, this expedition stitches together Simien Mountains National Park’s crown trails with community-owned camps. Move from Sankaber to Chennek with mobile kitchen crews, learn ridgetop weather patterns from Scout-guides, and contribute to conservation fees reinvested in anti-poaching patrols. Pre-trek briefings in Gondar cover layering systems, hydration, and emergency heli-evac protocols. Nights alternate between lodge comfort and expedition-style tented camps with insulated sleep systems.`,
+    category: 'Trekking & Adventure',
+    tourType: 'trekking',
+    status: 'published',
+    featured: true,
+    difficulty: 'challenging',
+    duration: { days: 10, nights: 9 },
+    destinations: ['Gondar', 'Debark', 'Sankaber', 'Gich', 'Chennek', 'Axum extension optional'],
+    startLocation: 'Gondar (GND) rendezvous hotel',
+    endLocation: 'Return to Gondar or Axum flight node',
+    destination: 'Simien Mountains',
+    legacyDestination: 'Simien Mountains',
+    basePrice: 2950,
+    price: 2950,
+    pricingType: 'per_person',
+    groupPricing: [
+        { minGuests: 4, maxGuests: 8, pricePerPerson: 2750 },
+        { minGuests: 9, maxGuests: 12, pricePerPerson: 2590 },
+    ],
+    seasonalPricing: [
+        { name: 'Highland dry trekking', startMonth: 10, startDay: 1, endMonth: 3, endDay: 31, multiplier: 1.12 },
+        { name: 'Monsoon trek value', startMonth: 7, startDay: 15, endMonth: 8, endDay: 31, multiplier: 0.9 },
+    ],
+    childPolicy: { childAgeMax: 14, discountPercent: 15, freeUnderAge: 0 },
+    minGuests: 4,
+    maxGuests: 12,
+    departureType: 'fixed_schedule',
+    bookingCutoffHours: 336,
+    included: [
+        'Licensed Simien scout-guides plus Dorze trek leader',
+        'All camping equipment: 4-season tents, insulated mats, mess tent',
+        'Chef-prepared trail meals & trail snacks',
+        'National park permits, community camp fees, and mule porter teams',
+        'Emergency satellite messenger rental & daily GPS tracking upload',
+        'Two lodge nights pre/post trek with laundry service',
+        'Private 4WD transfers Debark gate ↔ trailheads',
+    ],
+    excluded: [
+        'International airfare',
+        'Personal trekking poles (rental available locally)',
+        'Trip cancellation / evac insurance (mandatory proof required)',
+        'Single tent supplement',
+        'Tips for scout crew & kitchen teams',
+        'Extra nights in Addis',
+    ],
+    highlights: [
+        'Summit viewpoints along Chennek escarpment rim',
+        'Extended gelada behavioral observation sessions',
+        'Night sky astrophotography windows above 3,600 m',
+        'Community coffee equity fund contribution included in tariff',
+    ],
+    accommodations: [
+        {
+            destination: 'Simien ridge camps',
+            hotelCategory: 'expedition camp',
+            hotelOptions: [{ name: 'Mobile Dorze Alpine Camp', notes: 'Weather-proof mess tent & eco-loos' }],
+        },
+        {
+            destination: 'Debark gateway',
+            hotelCategory: '3-star lodge base',
+            hotelOptions: [{ name: 'Simien Lodge', notes: 'Hot showers before/after trek' }],
+        },
+    ],
+    transportSegments: [
+        { type: 'road', route: 'Gondar ↔ Debark HQ', vehicleType: 'Land Cruiser 4WD' },
+        { type: 'trek', route: 'Sankaber–Gich–Chennek corridor', vehicleType: 'Foot & mule support' },
+    ],
+    depositPercent: 30,
+    cancellationPolicy:
+        'Inside 90 days deposit forfeited toward community camp penalties; 90+ days deposit transferable once to a future Dorze trek departure within 18 months.',
+    childDiscountRules: 'Minimum age 14 for escarpment camps; documented altitude fitness questionnaire required.',
+    addons: [
+        { name: 'Private trekking guide (solo pacing)', price: 890, optional: true, description: 'Dedicated lead guide + assistant' },
+        { name: 'Single tent upgrade', price: 220, optional: true, description: 'Three-person mountain tent solo occupancy' },
+        { name: 'Portable oxygen cylinder standby', price: 180, optional: true, description: 'Medical-grade 10L with regulator' },
+        { name: 'Axum post-trek extension (2 nights)', price: 640, optional: true, description: 'Flights, hotel, stelae touring' },
+    ],
+    guideRequired: true,
+    vehicleRequired: true,
+    hotelRequired: false,
+    coverImage: IMG.simien,
+    gallery: [IMG.simien, IMG.gallery2, IMG.gallery4],
+    imageUrl: [IMG.simien],
+    metaTitle: 'Simien Mountains Trekking Expedition | 10-Day Guided Trek | Dorze Tours',
+    metaDescription:
+        'Trek Ethiopia’s Simien Mountains with scout-guides, gelada encounters, mobile camps, and ethical pacing across UNESCO Afro-alpine landscapes.',
+    averageRating: 4.92,
+    totalRatings: 89,
+    itinerary: [
+        itineraryDay({
+            day: 1,
+            title: 'Gondar Rendezvous — Gear Check',
+            description:
+                'Arrive Gondar, transfer to trek staging hotel. Equipment inspection, layering clinic, dinner with altitude medicine primer.',
+            activities: [activity('15:00', 'Gear audit & rental fittings'), activity('19:00', 'Altitude medicine Zoom with expedition medic')],
+            mealsIncluded: ['Dinner'],
+            overnight: 'Gondar hotel',
+            accommodationLevel: '3-star plus',
+        }),
+        itineraryDay({
+            day: 2,
+            title: 'Debark Gate — Sankaber First Camp',
+            description:
+                'Drive to Simien HQ, complete permits, trek gentle ridge to Sankaber camp among giant lobelia stands.',
+            activities: [
+                activity('08:00', 'HQ briefing with park warden'),
+                activity('13:30', 'Trek Sankaber ridge', 'Gelada introduction walks'),
+            ],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Sankaber camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 3,
+            title: 'Sankaber → Gich Camp',
+            description:
+                'Contour trails crossing streams, pause at Jinbar waterfall viewpoints, ascend toward Gich beneath escarpment folds.',
+            activities: [activity('07:30', 'Depart camp'), activity('14:00', 'Waterfall overlook picnic')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Gich camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 4,
+            title: 'Gich Acclimatization Loops',
+            description:
+                'Optional summit push or photography loops; workshops on endemic flora ID and weather reading.',
+            activities: [activity('06:00', 'Sunrise ridge loop'), activity('11:00', 'Flora/fauna workshop')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Gich camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 5,
+            title: 'Gich → Chennek High Camp',
+            description:
+                'Traverse highest sustained trekking segment with sweeping Tekeze River gorge vistas; arrive Chennek high camp.',
+            activities: [activity('06:30', 'Depart'), activity('16:30', 'Chennek sunset golden hour')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Chennek camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 6,
+            title: 'Chennek Ridge Study Day',
+            description:
+                'Behavioral observation of gelada bands, sketching sessions, optional photography critiques.',
+            activities: [activity('08:30', 'Gelada ethogram field notes'), activity('15:00', 'Photo critique circle')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Chennek camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 7,
+            title: 'Begin Descent — Community Guesthouse',
+            description:
+                'Descend toward lower valley cooperative guesthouse supporting trail maintenance fund; cultural exchange evening.',
+            activities: [activity('07:00', 'Descent trek'), activity('18:30', 'Community storytelling dinner')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Community guesthouse',
+            accommodationLevel: 'Community 3-star equivalent',
+        }),
+        itineraryDay({
+            day: 8,
+            title: 'Return Debark — Lodge Recovery',
+            description:
+                'Short hike to vehicle rendezvous, transfer Simien Lodge for hot showers, massage optional, debrief metrics.',
+            activities: [activity('09:00', 'Trail exit'), activity('16:00', 'Recovery spa slot')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Simien Lodge',
+            accommodationLevel: 'Lodge',
+        }),
+        itineraryDay({
+            day: 9,
+            title: 'Gondar Cultural Buffer Day',
+            description:
+                'Rest day in Gondar with optional castle revisit, coffee cupping, packing assistance.',
+            activities: [activity('10:00', 'Castle photography free time'), activity('15:00', 'Coffee lab tasting')],
+            mealsIncluded: ['Breakfast', 'Dinner'],
+            overnight: 'Gondar hotel',
+            accommodationLevel: '3-star plus',
+        }),
+        itineraryDay({
+            day: 10,
+            title: 'Depart',
+            description: 'Airport transfer for outbound flights or extensions.',
+            activities: [activity('08:00', 'Breakfast'), activity('10:30', 'Airport drop-off')],
+            mealsIncluded: ['Breakfast'],
+            overnight: 'Departure',
+            accommodationLevel: 'n/a',
+        }),
+    ],
+};

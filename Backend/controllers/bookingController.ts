@@ -15,6 +15,10 @@ import { createAuditLog } from '../utils/auditLogger';
 import Log from '../models/logModel';
 import CustomTrip from '../models/customTripModel';
 import { checkResourceAvailability } from '../services/resourceAvailabilityService';
+import PackageDeparture from '../modules/packages/models/packageDepartureModel';
+import { calculatePackageQuote } from '../modules/packages/services/pricingService';
+import { checkPackageAvailability } from '../modules/packages/services/availabilityService';
+import { buildAllocationPlaceholder } from '../modules/packages/services/resourceAllocationService';
 
 // Explicit Statuses
 export enum BookingStatus {
@@ -152,6 +156,9 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
         carId,
         car,
         numberOfPeople = 1,
+        children = 0,
+        departureId,
+        selectedAddons,
         paymentMethod,
         notes,
         checkInDate,
@@ -180,21 +187,89 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
         let totalPrice = 0;
         let bookingDetails: any = {};
 
-        // Handle Tour booking
+        // Handle Tour booking (enterprise pricing + optional departure)
         if (bookingTypeNormalized === 'tour') {
             const tour = await Tour.findById(tourId).session(session);
             if (!tour) {
                 res.status(404);
                 throw new Error('Tour not found');
             }
-            totalPrice = tour.price * numberOfPeople;
+
+            const addonNames: string[] =
+                Array.isArray(selectedAddons) && selectedAddons.length
+                    ? selectedAddons
+                          .map((a: any) => (typeof a === 'string' ? a : a?.name))
+                          .filter(Boolean)
+                    : [];
+
+            const guestTotal = Math.max(1, Number(numberOfPeople) || 1);
+            const childCount = Math.max(0, Math.min(Number(children) || 0, guestTotal));
+
+            const avail = await checkPackageAvailability(tour, {
+                packageId: String(tourId),
+                departureId: departureId ? String(departureId) : undefined,
+                guests: guestTotal,
+                bookingDate: bookingDate ? new Date(bookingDate) : undefined,
+            });
+            if (!avail.available) {
+                res.status(409);
+                throw new Error(avail.reasons.join('; ') || 'Not available for selected options');
+            }
+
+            const quote = calculatePackageQuote(tour, {
+                guests: guestTotal,
+                children: childCount,
+                travelDate: bookingDate ? new Date(bookingDate) : undefined,
+                selectedAddonNames: addonNames,
+            });
+
+            totalPrice = quote.total;
+            const depositAmount = quote.deposit;
+
+            const persistedAddons = addonNames.map((name) => {
+                const addon = (tour as any).addons?.find((x: any) => x?.name === name);
+                return { name, price: Number(addon?.price ?? 0) };
+            });
+
             bookingDetails = {
                 tour: tourId,
-                bookingDate: bookingDate ? new Date(bookingDate) : undefined
+                bookingDate: bookingDate ? new Date(bookingDate) : undefined,
+                departureId: departureId || undefined,
+                selectedAddons: persistedAddons.length ? persistedAddons : undefined,
+                packagePricingSnapshot: {
+                    currency: quote.currency,
+                    lines: quote.lines,
+                    subtotal: quote.subtotal,
+                    discounts: quote.discounts,
+                    deposit: quote.deposit,
+                    total: quote.total,
+                    pricingType: quote.pricingType,
+                    quotedAt: new Date(),
+                    guests: guestTotal,
+                    children: childCount,
+                },
+                depositAmount,
             };
             if (!bookingDetails.bookingDate) {
                 res.status(400);
                 throw new Error('bookingDate is required for Tour bookings');
+            }
+
+            if (departureId) {
+                const dep = await PackageDeparture.findById(departureId).session(session);
+                if (!dep) {
+                    res.status(404);
+                    throw new Error('Departure not found');
+                }
+                if ((dep.bookedCount || 0) + guestTotal > dep.capacity) {
+                    res.status(409);
+                    throw new Error('Departure capacity exceeded');
+                }
+                await PackageDeparture.findByIdAndUpdate(
+                    departureId,
+                    { $inc: { bookedCount: guestTotal } },
+                    { session }
+                );
             }
         }
 
@@ -314,6 +389,21 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
 
         await session.commitTransaction();
         session.endSession();
+
+        if (bookingTypeNormalized === 'tour' && booking.tour) {
+            try {
+                const tourDoc = await Tour.findById(booking.tour).lean();
+                buildAllocationPlaceholder({
+                    bookingId: String(booking._id),
+                    packageId: String(booking.tour),
+                    guideRequired: tourDoc?.guideRequired,
+                    vehicleRequired: tourDoc?.vehicleRequired,
+                    hotelRequired: tourDoc?.hotelRequired,
+                });
+            } catch {
+                /* allocation logging is non-blocking */
+            }
+        }
 
         // Send confirmation email asynchronously
         sendEmail({

@@ -51,6 +51,22 @@ export interface IBooking extends Document {
             finalTotal?: number;
         };
     };
+    /** Tour package quote snapshot (server-calculated) */
+    packagePricingSnapshot?: {
+        currency: string;
+        lines: { label: string; amount: number }[];
+        subtotal: number;
+        discounts: number;
+        deposit: number;
+        total: number;
+        pricingType?: string;
+        quotedAt: Date;
+        guests?: number;
+        children?: number;
+    };
+    departureId?: mongoose.Types.ObjectId;
+    selectedAddons?: { name: string; price: number }[];
+    depositAmount?: number;
     isRequest?: boolean;
     customTrip?: mongoose.Types.ObjectId;
     history: {
@@ -173,6 +189,34 @@ const bookingSchema: Schema<IBooking> = new Schema(
                 finalTotal: { type: Number, min: 0 },
             }
         },
+        packagePricingSnapshot: {
+            currency: { type: String, default: 'USD' },
+            lines: [
+                {
+                    label: { type: String },
+                    amount: { type: Number },
+                },
+            ],
+            subtotal: { type: Number, min: 0 },
+            discounts: { type: Number, min: 0 },
+            deposit: { type: Number, min: 0 },
+            total: { type: Number, min: 0 },
+            pricingType: { type: String },
+            quotedAt: { type: Date },
+            guests: { type: Number, min: 1 },
+            children: { type: Number, min: 0 },
+        },
+        departureId: {
+            type: Schema.Types.ObjectId,
+            ref: 'PackageDeparture',
+        },
+        selectedAddons: [
+            {
+                name: { type: String },
+                price: { type: Number, min: 0 },
+            },
+        ],
+        depositAmount: { type: Number, min: 0 },
         isRequest: {
             type: Boolean,
             default: false,

@@ -25,9 +25,7 @@ export function TourCard({ tour }: TourCardProps) {
         featured,
     } = tour;
 
-    console.log(`Tour ${title} images:`, { images, imageUrl });
     const resolvedUrl = resolveImageUrl(images?.[0] || imageUrl?.[0]);
-    console.log(`Resolved URL for ${title}:`, resolvedUrl);
 
     const displayPrice = discountPrice || price;
     const hasDiscount = !!discountPrice && discountPrice < price;

@@ -5,6 +5,8 @@ export interface IUser extends Document {
     first_name?: string;
     last_name?: string;
     name?: string; // Added for compatibility with Passport/OAuth
+    /** Display name for dashboards / seeded admin profiles */
+    fullName?: string;
     email: string;
     password?: string;
     country?: string;
@@ -12,6 +14,10 @@ export interface IUser extends Document {
     verificationToken?: string;
     verified: boolean;
     role: 'user' | 'admin';
+    /** Fine-grained capabilities for enterprise admin UX (optional). */
+    permissions?: string[];
+    /** Account lifecycle — distinct from booking status. */
+    status?: 'active' | 'inactive' | 'suspended';
     googleId?: string;
     refreshToken?: string; // Stored hashed
     matchPassword(enteredPassword: string): Promise<boolean>;
@@ -32,6 +38,13 @@ const userSchema: Schema<IUser> = new Schema(
             type: String,
             enum: ['user', 'admin'],
             default: 'user',
+        },
+        fullName: { type: String, trim: true },
+        permissions: [{ type: String, trim: true }],
+        status: {
+            type: String,
+            enum: ['active', 'inactive', 'suspended'],
+            default: 'active',
         },
         googleId: { type: String },
         refreshToken: { type: String },

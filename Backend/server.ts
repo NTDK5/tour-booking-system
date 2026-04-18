@@ -17,6 +17,7 @@ import { apiLimiter } from './middleware/rateLimiter';
 // Routes
 import userRoutes from './routes/userRoutes';
 import tourRoutes from './routes/tourRoutes';
+import publicPackageRoutes from './routes/publicPackageRoutes';
 import bookingRoutes from './routes/bookingRoutes';
 import reviewRoutes from './routes/reviewRoutes';
 import paymentRoutes from './routes/paymentRoutes';
@@ -47,7 +48,7 @@ app.use(helmet({
 console.log('Setting up cors...');
 app.use(cors({
     origin: process.env.FRONTEND_URL,
-    methods: 'GET,POST,PUT,DELETE',
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     credentials: true,
 }));
 
@@ -96,6 +97,7 @@ app.use('/uploads', express.static('uploads'));
 console.log('Setting up routes...');
 app.use('/api/users', userRoutes);
 app.use('/api/tours', tourRoutes);
+app.use('/api/packages', publicPackageRoutes);
 app.use('/api/bookings', bookingRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/payments', paymentRoutes);

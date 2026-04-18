@@ -56,6 +56,7 @@ export function useDeleteTour() {
         mutationFn: (id: string) => toursApi.delete(id),
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: tourKeys.all });
+            queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
             toast.success('Tour deleted successfully');
         },
         onError: () => toast.error('Failed to delete tour'),

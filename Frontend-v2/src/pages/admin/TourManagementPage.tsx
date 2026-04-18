@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Globe,
     Plus,
@@ -13,18 +14,50 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useTours, useCreateTour, useUpdateTour, useDeleteTour } from '@/hooks/useTours';
+import { useDeleteTour, tourKeys } from '@/hooks/useTours';
+import { adminPackagesApi } from '@/api/packages';
 import { Skeleton } from '@/components/ui/Skeleton';
-import { TourFormModal } from '@/features/admin/TourFormModal';
+import { PackageBuilderModal } from '@/features/admin/packages/PackageBuilderModal';
 import type { Tour } from '@/types';
 
+function mapAdminRowToTour(t: Record<string, any>): Tour {
+    const dest = Array.isArray(t.destinations) && t.destinations.length ? t.destinations[0] : t.destination || '';
+    const days = t.duration?.days ?? (typeof t.duration === 'number' ? t.duration : 1);
+    return {
+        ...t,
+        _id: String(t._id),
+        title: t.title || '',
+        description: t.description || t.fullDescription || '',
+        destination: dest,
+        duration: typeof days === 'number' ? days : 1,
+        groupSize: t.maxGuests ?? t.groupSize ?? 10,
+        price: t.basePrice ?? t.price ?? 0,
+        images: t.gallery || t.images || t.imageUrl || [],
+        highlights: t.highlights || [],
+        included: t.included || [],
+        excluded: t.excluded || [],
+        itinerary: t.itinerary || [],
+        tourType: t.tourType || 'cultural',
+        difficulty: t.difficulty || 'moderate',
+        rating: t.averageRating ?? 0,
+        reviewCount: t.totalRatings ?? 0,
+        featured: !!t.featured,
+        tags: t.tags || [],
+        createdAt: t.createdAt || '',
+        updatedAt: t.updatedAt || '',
+    } as Tour;
+}
+
 export default function TourManagementPage() {
+    const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
 
-    const { data: toursData, isLoading, error } = useTours();
-    const createTour = useCreateTour();
-    const updateTour = useUpdateTour();
+    const { data: toursData, isLoading, error } = useQuery({
+        queryKey: ['admin-packages'],
+        queryFn: () => adminPackagesApi.list({ limit: 200 }),
+    });
+
     const deleteTour = useDeleteTour();
 
     const handleEdit = (tour: Tour) => {
@@ -35,15 +68,6 @@ export default function TourManagementPage() {
     const handleCreate = () => {
         setSelectedTour(null);
         setIsModalOpen(true);
-    };
-
-    const handleSave = async (data: Partial<Tour>) => {
-        if (selectedTour) {
-            await updateTour.mutateAsync({ id: selectedTour._id, payload: data });
-        } else {
-            await createTour.mutateAsync(data);
-        }
-        setIsModalOpen(false);
     };
 
     const handleDelete = async (id: string) => {
@@ -77,18 +101,22 @@ export default function TourManagementPage() {
             </div>
 
             {isModalOpen && (
-                <TourFormModal
+                <PackageBuilderModal
                     tour={selectedTour}
                     onClose={() => setIsModalOpen(false)}
-                    onSave={handleSave}
-                    isLoading={createTour.isPending || updateTour.isPending}
+                    onSaved={() => {
+                        queryClient.invalidateQueries({ queryKey: tourKeys.all });
+                        queryClient.invalidateQueries({ queryKey: ['admin-packages'] });
+                    }}
                 />
             )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {isLoading ? (
                     [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] rounded-2xl" />)
-                ) : toursData?.data.map((tour) => (
+                ) : toursData?.data.map((raw) => {
+                    const tour = mapAdminRowToTour(raw as Record<string, any>);
+                    return (
                     <div key={tour._id} className="bg-surface-light border border-surface-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:border-primary/50 flex flex-col group">
                         <div className="p-6 flex-grow">
                             <div className="flex justify-between items-start mb-4">
@@ -146,7 +174,8 @@ export default function TourManagementPage() {
                             </div>
                         </div>
                     </div>
-                ))}
+                    );
+                })}
             </div>
 
             {!isLoading && toursData?.data.length === 0 && (

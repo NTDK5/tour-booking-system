@@ -1,0 +1,151 @@
+import { IMG } from '../mediaAssets';
+import { activity, itineraryDay } from '../itineraryHelpers';
+
+export const danakilAdventurePackage = {
+    schemaVersion: 2,
+    packageCode: 'ETH-DANAKIL-6D',
+    title: 'Danakil Depression Adventure — Erta Ale Lava Lake & Dallol Hydrothermal Fields',
+    slug: 'danakil-depression-adventure-erta-ale-dallol',
+    shortDescription:
+        'Six-day expedition across one of Earth’s lowest, hottest landscapes: climb Erta Ale’s lava lake at night, wander technicolor Dallol mineral terraces, and traverse salt caravan routes with armed escort teams and expedition medics.',
+    fullDescription: `This compact adrenaline itinerary demands fitness and heat tolerance yet rewards with surreal geology few travelers witness responsibly. Convoy logistics include armored escort rotation, salted Afar guide partnerships, and redundant water reserves. Dorze maintains strict group size caps to minimize environmental stress on fragile mineral formations while funding community salt cooperatives through transparent fee splits.`,
+    category: 'Extreme Adventure',
+    tourType: 'adventure',
+    status: 'published',
+    featured: false,
+    difficulty: 'hard',
+    duration: { days: 6, nights: 5 },
+    destinations: ['Mekele', 'Hamed Ela', 'Erta Ale base', 'Dallol', 'Lake Afrera'],
+    startLocation: 'Mekele (MQX) rendezvous hotel',
+    endLocation: 'Mekele airport',
+    destination: 'Danakil Depression',
+    legacyDestination: 'Danakil Depression',
+    basePrice: 2180,
+    price: 2180,
+    pricingType: 'per_person',
+    groupPricing: [
+        { minGuests: 4, maxGuests: 12, pricePerPerson: 2050 },
+    ],
+    seasonalPricing: [
+        { name: 'Cooler season trek', startMonth: 11, startDay: 1, endMonth: 2, endDay: 28, multiplier: 1.06 },
+    ],
+    childPolicy: { childAgeMax: 12, discountPercent: 0, freeUnderAge: 0 },
+    minGuests: 4,
+    maxGuests: 12,
+    departureType: 'fixed_schedule',
+    bookingCutoffHours: 168,
+    included: [
+        'Armed Afar scout escorts & regional permits',
+        '4WD convoy vehicles with mechanic',
+        'Camp crew & mess tents for desert nights',
+        'All meals expedition-style',
+        'Heat-stress medical officer rotation',
+        'Salt caravan cooperative fee distributions',
+        'Protective masks & sulfur zone PPE',
+    ],
+    excluded: [
+        'International airfare',
+        'Travel insurance covering extreme heat rating',
+        'Personal cooling vests (rent optional)',
+        'Tips for scouts & drivers',
+        'Optional camel portage',
+    ],
+    highlights: [
+        'Night ascent to Erta Ale lava lake rim',
+        'Dallol sulfur terraces at first light',
+        'Salt cutting cooperative hands-on segment',
+        'Lake Afrera mineral swim (conditions permitting)',
+    ],
+    accommodations: [
+        {
+            destination: 'Danakil camps',
+            hotelCategory: 'expedition camp',
+            hotelOptions: [{ name: 'Mobile shaded camp', notes: 'Cot beds & sleeping bags supplied' }],
+        },
+    ],
+    transportSegments: [
+        { type: 'road', route: 'Mekele ↔ Danakil gates', vehicleType: 'Toyota Land Cruiser convoy' },
+        { type: 'trek', route: 'Erta Ale night ascent', vehicleType: 'Foot escort trail' },
+    ],
+    depositPercent: 35,
+    cancellationPolicy:
+        'Government escort permits purchased early; cancellations inside 75 days forfeit deposit applied to scout contracts.',
+    childDiscountRules: 'Minimum age 16 due to heat stress & night trekking; waivers mandatory.',
+    addons: [
+        { name: 'Personal cooling vest rental', price: 95, optional: true, description: 'PCM vest + spare battery' },
+        { name: 'Drone scout photo passes', price: 210, optional: true, description: 'Where military clearance granted' },
+        { name: 'Private medic escort', price: 1400, optional: true, description: 'Paramedic with ALS kit' },
+    ],
+    guideRequired: true,
+    vehicleRequired: true,
+    hotelRequired: false,
+    coverImage: IMG.danakil,
+    gallery: [IMG.danakil, IMG.gallery4, IMG.gallery1],
+    imageUrl: [IMG.danakil],
+    metaTitle: 'Danakil Depression Tour | Erta Ale & Dallol Expedition | Dorze Tours',
+    metaDescription:
+        'Six-day Danakil Depression expedition: Erta Ale lava lake night trek, Dallol mineral formations, salt caravans, and Afar-guided convoy logistics.',
+    averageRating: 4.73,
+    totalRatings: 112,
+    itinerary: [
+        itineraryDay({
+            day: 1,
+            title: 'Mekele Briefing — Heat Protocols',
+            description:
+                'Arrive Mekele, equipment stress test, medical vitals log, dinner with volcanologist lecture.',
+            activities: [activity('14:00', 'Hotel briefing'), activity('19:00', 'Volcano geology talk')],
+            mealsIncluded: ['Dinner'],
+            overnight: 'Mekele hotel',
+            accommodationLevel: '3-star plus',
+        }),
+        itineraryDay({
+            day: 2,
+            title: 'Convoy to Hamed Ela',
+            description:
+                'Long desert traverse with hydration checkpoints; sunset salt plain photography.',
+            activities: [activity('06:00', 'Convoy depart'), activity('18:30', 'Salt mirror shoot')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Desert camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 3,
+            title: 'Erta Ale Night Ascent',
+            description:
+                'Evening trek to lava lake rim; sulfur wind shifts monitored; dawn descent.',
+            activities: [activity('20:00', 'Night ascent begins'), activity('04:30', 'Lava lake observation')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Mountain bivouac',
+            accommodationLevel: 'Open-air bivouac',
+        }),
+        itineraryDay({
+            day: 4,
+            title: 'Dallol Mineral Terraces',
+            description:
+                'Sunrise hydrothermal fields walk with gas monitors; macro mineral photography clinic.',
+            activities: [activity('05:30', 'Dallol circuits'), activity('11:00', 'Gas safety drill')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Desert camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 5,
+            title: 'Salt Caravan Cooperative',
+            description:
+                'Hands-on salt tile lifting ethics session; fair wage transparency talk.',
+            activities: [activity('08:00', 'Caravan shadowing'), activity('16:00', 'Cooperative dividend talk')],
+            mealsIncluded: ['Breakfast', 'Lunch', 'Dinner'],
+            overnight: 'Hamed Ela camp',
+            accommodationLevel: 'Expedition camp',
+        }),
+        itineraryDay({
+            day: 6,
+            title: 'Return Mekele — Fly Out',
+            description: 'Drive back to Mekele, showers, airport transfers.',
+            activities: [activity('07:00', 'Convoy return'), activity('14:00', 'Airport assist')],
+            mealsIncluded: ['Breakfast'],
+            overnight: 'Departure',
+            accommodationLevel: 'n/a',
+        }),
+    ],
+};
