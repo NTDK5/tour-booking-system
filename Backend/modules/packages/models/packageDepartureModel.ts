@@ -5,7 +5,12 @@ export interface IPackageDeparture extends Document {
     startsAt: Date;
     endsAt?: Date;
     capacity: number;
+    /** @deprecated Prefer reservedGuests + confirmedGuests — kept for migration/backfill */
     bookedCount: number;
+    /** Seats held by pending / unpaid bookings */
+    reservedGuests: number;
+    /** Seats attributed to confirmed operational bookings */
+    confirmedGuests: number;
     status: 'scheduled' | 'open' | 'full' | 'cancelled';
     sku?: string;
     notes?: string;
@@ -23,6 +28,8 @@ const packageDepartureSchema = new Schema<IPackageDeparture>(
         endsAt: Date,
         capacity: { type: Number, required: true, min: 1 },
         bookedCount: { type: Number, default: 0, min: 0 },
+        reservedGuests: { type: Number, default: 0, min: 0 },
+        confirmedGuests: { type: Number, default: 0, min: 0 },
         status: {
             type: String,
             enum: ['scheduled', 'open', 'full', 'cancelled'],

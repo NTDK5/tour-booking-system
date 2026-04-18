@@ -5,7 +5,6 @@ import mongoose from 'mongoose';
 import Booking from '../models/bookingModel';
 import Tour from '../models/tourModel';
 import Lodge from '../models/lodgeModel';
-import Car from '../models/carModel';
 import logger from '../utils/logger';
 import { sendEmail } from '../utils/email';
 import { AuthRequest } from '../middleware/authMiddleware';
@@ -15,10 +14,17 @@ import { createAuditLog } from '../utils/auditLogger';
 import Log from '../models/logModel';
 import CustomTrip from '../models/customTripModel';
 import { checkResourceAvailability } from '../services/resourceAvailabilityService';
-import PackageDeparture from '../modules/packages/models/packageDepartureModel';
-import { calculatePackageQuote } from '../modules/packages/services/pricingService';
-import { checkPackageAvailability } from '../modules/packages/services/availabilityService';
 import { buildAllocationPlaceholder } from '../modules/packages/services/resourceAllocationService';
+import { createBookingTransactional } from '../modules/bookings/services/bookingCreationService';
+import { ApiError } from '../utils/ApiError';
+import Stripe from 'stripe';
+import Payment from '../models/paymentModel';
+import { derivePaymentTotals } from '../modules/bookings/payments/bookingPaymentService';
+import { paymentSummaryFromBooking } from '../modules/bookings/dto/bookingDto';
+
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
+    apiVersion: '2025-01-27.acacia' as any,
+});
 
 // Explicit Statuses
 export enum BookingStatus {
@@ -149,208 +155,25 @@ const checkResourceConflicts = async (booking: any) => {
 // @route POST /api/bookings
 // @access Private
 export const createBooking = asyncHandler(async (req: any, res: any) => {
-    const {
-        bookingType,
-        tourId,
-        lodgeId,
-        carId,
-        car,
-        numberOfPeople = 1,
-        children = 0,
-        departureId,
-        selectedAddons,
-        paymentMethod,
-        notes,
-        checkInDate,
-        checkOutDate,
-        roomType,
-        pickupLocation,
-        dropoffLocation,
-        bookingDate,
-        isRequest = false,
-        customCarRequest
-    } = req.body;
+    const { bookingType, isRequest = false, customCarRequest } = req.body;
 
     const session = await mongoose.startSession();
     session.startTransaction();
 
     try {
+        let booking;
+        try {
+            booking = await createBookingTransactional(req, session);
+        } catch (err: any) {
+            if (err instanceof ApiError) {
+                res.status(err.statusCode);
+            }
+            throw err;
+        }
+
         const bookingTypeNormalized = String(bookingType || '').toLowerCase();
-        const bookingTypeForStorage =
-            bookingTypeNormalized === 'tour'
-                ? 'Tour'
-                : bookingTypeNormalized === 'lodge'
-                    ? 'Lodge'
-                    : 'Car';
-
-        const userId = req.user._id;
-        let totalPrice = 0;
-        let bookingDetails: any = {};
-
-        // Handle Tour booking (enterprise pricing + optional departure)
-        if (bookingTypeNormalized === 'tour') {
-            const tour = await Tour.findById(tourId).session(session);
-            if (!tour) {
-                res.status(404);
-                throw new Error('Tour not found');
-            }
-
-            const addonNames: string[] =
-                Array.isArray(selectedAddons) && selectedAddons.length
-                    ? selectedAddons
-                          .map((a: any) => (typeof a === 'string' ? a : a?.name))
-                          .filter(Boolean)
-                    : [];
-
-            const guestTotal = Math.max(1, Number(numberOfPeople) || 1);
-            const childCount = Math.max(0, Math.min(Number(children) || 0, guestTotal));
-
-            const avail = await checkPackageAvailability(tour, {
-                packageId: String(tourId),
-                departureId: departureId ? String(departureId) : undefined,
-                guests: guestTotal,
-                bookingDate: bookingDate ? new Date(bookingDate) : undefined,
-            });
-            if (!avail.available) {
-                res.status(409);
-                throw new Error(avail.reasons.join('; ') || 'Not available for selected options');
-            }
-
-            const quote = calculatePackageQuote(tour, {
-                guests: guestTotal,
-                children: childCount,
-                travelDate: bookingDate ? new Date(bookingDate) : undefined,
-                selectedAddonNames: addonNames,
-            });
-
-            totalPrice = quote.total;
-            const depositAmount = quote.deposit;
-
-            const persistedAddons = addonNames.map((name) => {
-                const addon = (tour as any).addons?.find((x: any) => x?.name === name);
-                return { name, price: Number(addon?.price ?? 0) };
-            });
-
-            bookingDetails = {
-                tour: tourId,
-                bookingDate: bookingDate ? new Date(bookingDate) : undefined,
-                departureId: departureId || undefined,
-                selectedAddons: persistedAddons.length ? persistedAddons : undefined,
-                packagePricingSnapshot: {
-                    currency: quote.currency,
-                    lines: quote.lines,
-                    subtotal: quote.subtotal,
-                    discounts: quote.discounts,
-                    deposit: quote.deposit,
-                    total: quote.total,
-                    pricingType: quote.pricingType,
-                    quotedAt: new Date(),
-                    guests: guestTotal,
-                    children: childCount,
-                },
-                depositAmount,
-            };
-            if (!bookingDetails.bookingDate) {
-                res.status(400);
-                throw new Error('bookingDate is required for Tour bookings');
-            }
-
-            if (departureId) {
-                const dep = await PackageDeparture.findById(departureId).session(session);
-                if (!dep) {
-                    res.status(404);
-                    throw new Error('Departure not found');
-                }
-                if ((dep.bookedCount || 0) + guestTotal > dep.capacity) {
-                    res.status(409);
-                    throw new Error('Departure capacity exceeded');
-                }
-                await PackageDeparture.findByIdAndUpdate(
-                    departureId,
-                    { $inc: { bookedCount: guestTotal } },
-                    { session }
-                );
-            }
-        }
-
-        // Handle Lodge booking
-        else if (bookingTypeNormalized === 'lodge') {
-            const lodge: any = await Lodge.findById(lodgeId).session(session);
-            if (!lodge) {
-                res.status(404);
-                throw new Error('Lodge not found');
-            }
-
-            const selectedRoomType = lodge.roomTypes?.find(
-                (room: any) => room.type === roomType
-            );
-            if (!selectedRoomType) {
-                res.status(400);
-                throw new Error('Invalid room type selected');
-            }
-
-            const numberOfNights = checkOutDate && checkInDate ? Math.ceil(
-                (new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24)
-            ) : 1;
-
-            totalPrice = selectedRoomType.price * numberOfNights;
-            bookingDetails = {
-                lodge: lodgeId,
-                checkInDate,
-                checkOutDate,
-                roomType
-            };
-        }
-
-        // Handle Car booking
-        else if (bookingTypeNormalized === 'car' && !carId && !car && customCarRequest) {
-            totalPrice = 0; // Price will be proposed by admin
-            bookingDetails = {
-                customCarRequest,
-                isRequest: true,
-                status: BookingStatus.SUBMITTED
-            };
-        }
-
-        // Handle Car booking from fleet
-        else if (bookingTypeNormalized === 'car') {
-            const selectedCarId = carId || car;
-            const selectedCar: any = await Car.findById(selectedCarId).session(session);
-            if (!selectedCar) {
-                res.status(404);
-                throw new Error('Car not found');
-            }
-            if (!selectedCar.available) {
-                res.status(400);
-                throw new Error('Car is not available for booking');
-            }
-
-            const numberOfDays = checkOutDate && checkInDate ? Math.ceil(
-                (new Date(checkOutDate).getTime() - new Date(checkInDate).getTime()) / (1000 * 60 * 60 * 24)
-            ) : 1;
-
-            totalPrice = selectedCar.pricePerDay * numberOfDays;
-            bookingDetails = {
-                car: selectedCarId,
-                checkInDate,
-                checkOutDate,
-                pickupLocation,
-                dropoffLocation
-            };
-        }
-
-        // Create the booking with PENDING status
-        const [booking] = await Booking.create([{
-            user: userId,
-            bookingType: bookingTypeForStorage,
-            numberOfPeople,
-            totalPrice,
-            paymentMethod: paymentMethod || 'paypal',
-            notes,
-            status: (isRequest || customCarRequest) ? BookingStatus.UNDER_REVIEW : BookingStatus.PENDING,
-            isRequest: isRequest || !!customCarRequest,
-            ...bookingDetails
-        }], { session });
+        const bookingTypeForStorage = booking.bookingType as string;
+        const totalPrice = booking.totalPrice;
 
         // Fill unified resource/date fields for compatibility and unified calendar.
         const resourceId = booking.tour || booking.lodge || booking.car;
@@ -373,7 +196,7 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
                 },
                 String(booking._id)
             );
-            if (!availabilityCheck.available && !isRequest) {
+            if (!availabilityCheck.available && !booking.isRequest) {
                 await session.abortTransaction();
                 session.endSession();
                 res.status(409);
@@ -383,7 +206,7 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
         }
 
         // Update availability only for instant bookings
-        if (!isRequest) {
+        if (!booking.isRequest) {
             await updateAvailabilityAfterBooking(booking, session);
         }
 
@@ -424,24 +247,6 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
                 </div>
             `,
         }).catch(err => logger.error('Confirmation email failed', err));
-
-        await createAuditLog({
-            user: req.user?._id,
-            action: isRequest || customCarRequest ? 'Submitted booking request' : 'Created booking',
-            actionType: 'BOOKING',
-            resource: bookingTypeForStorage,
-            resourceId: String(booking._id),
-            details: `${bookingTypeForStorage} booking created with status ${booking.status}`,
-            status: 'success',
-            ip: req.ip,
-            userAgent: req.get('user-agent'),
-            actorRole: req.user?.role === 'admin' ? 'admin' : 'user',
-            metadata: {
-                bookingType: bookingTypeForStorage,
-                isRequest: Boolean(isRequest || customCarRequest),
-                totalPrice,
-            },
-        });
 
         res.status(201).json(toSerializableBooking(booking));
     } catch (error) {
@@ -587,6 +392,51 @@ export const updateBooking = asyncHandler(async (req: any, res: any) => {
     res.status(200).json(toSerializableBooking(updatedBooking));
 });
 
+// @desc Pay remaining balance (Stripe PaymentIntent for authenticated owner)
+// @route POST /api/bookings/:id/payments/balance
+// @access Private
+export const payBookingBalance = asyncHandler(async (req: any, res: any) => {
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) {
+        res.status(404);
+        throw new Error('Booking not found');
+    }
+
+    const isOwner = String(booking.user) === String(req.user._id);
+    const isAdmin = req.user.role === 'admin';
+    if (!isOwner && !isAdmin) {
+        res.status(403);
+        throw new Error('Not authorized');
+    }
+
+    const { balanceDue } = derivePaymentTotals(booking as any);
+    const amount = Number(req.body.amount);
+    if (!Number.isFinite(amount) || amount <= 0 || amount > balanceDue + 0.02) {
+        res.status(400);
+        throw new Error('Invalid payment amount');
+    }
+
+    const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(amount * 100),
+        currency: 'usd',
+        metadata: {
+            bookingId: String(booking._id),
+            paymentPurpose: 'balance',
+        },
+    });
+
+    await Payment.create({
+        amount,
+        booking: booking._id,
+        status: 'pending',
+        provider: 'stripe',
+        txRef: `st_${paymentIntent.id}`,
+        stripePaymentIntentId: paymentIntent.id,
+    });
+
+    res.status(200).json({ clientSecret: paymentIntent.client_secret });
+});
+
 // @desc Get user bookings
 // @route GET /api/bookings/user
 // @access Private
@@ -604,7 +454,16 @@ export const getUserBookings = asyncHandler(async (req: any, res: any) => {
                 { path: 'reviewedItinerary.itineraryItem', model: 'Itinerary' }
             ]
         });
-    res.status(200).json(userBookings.map((b: any) => toSerializableBooking(b)));
+    res.status(200).json(
+        userBookings.map((b: any) => {
+            const serialized = toSerializableBooking(b);
+            const summary = paymentSummaryFromBooking(b);
+            const customer = { ...(serialized as any) };
+            delete customer.internalNotes;
+            delete customer.auditTrail;
+            return { ...customer, paymentSummary: summary };
+        })
+    );
 });
 
 // @desc Get booking by ID
@@ -638,7 +497,17 @@ export const getBookingById = asyncHandler(async (req: any, res: any) => {
         throw new Error('Not authorized to view this booking');
     }
 
-    res.status(200).json(toSerializableBooking(booking));
+    const serialized = toSerializableBooking(booking);
+    const summary = paymentSummaryFromBooking(booking as any);
+    if (isAdmin) {
+        res.status(200).json({ ...(serialized as any), paymentSummary: summary });
+        return;
+    }
+
+    const customer = { ...(serialized as any) };
+    delete customer.internalNotes;
+    delete customer.auditTrail;
+    res.status(200).json({ ...customer, paymentSummary: summary });
 });
 
 // @desc User responds to custom offer

@@ -12,9 +12,10 @@ import {
     respondToOffer,
     confirmRequestBooking,
     getBookingTimeline,
+    payBookingBalance,
 } from '../controllers/bookingController';
 
-import { bookingSchema, updateBookingSchema } from '../schemas/bookingSchemas';
+import { bookingSchema, updateBookingSchema, payBalanceSchema } from '../schemas/bookingSchemas';
 import { validate } from '../middleware/validationMiddleware';
 
 const router = express.Router();
@@ -26,6 +27,7 @@ router.route('/')
 router.get('/user', protect, getUserBookings);
 router.get('/check-availability', protect, checkAvailability);
 router.get('/:id/timeline', protect, getBookingTimeline);
+router.post('/:id/payments/balance', protect, validate(payBalanceSchema), payBookingBalance);
 router.put('/:id/respond-offer', protect, respondToOffer);
 router.put('/:id/confirm-request', protect, admin, confirmRequestBooking);
 router.delete('/:id/cancel', protect, cancelBooking);

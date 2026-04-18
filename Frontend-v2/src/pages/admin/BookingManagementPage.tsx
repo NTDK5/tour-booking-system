@@ -20,16 +20,21 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import toast from 'react-hot-toast';
 
 import { OfflineBookingForm } from '@/features/admin/OfflineBookingForm';
+import { AdminBookingDetailModal } from '@/features/admin/bookings/AdminBookingDetailModal';
 
 export default function BookingManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
     const [filterType, setFilterType] = useState('All');
+    const [lifecycleFilter, setLifecycleFilter] = useState('');
     const [isManualModalOpen, setIsManualModalOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<any>(null);
-    const [detailBooking, setDetailBooking] = useState<any>(null);
+    const [detailBookingId, setDetailBookingId] = useState<string | null>(null);
     const [proposedPrice, setProposedPrice] = useState('');
 
-    const { data: bookings, isLoading, error, refetch } = useAdminBookings();
+    const { data: bookings, isLoading, error, refetch } = useAdminBookings({
+        lifecycleStatus: lifecycleFilter || undefined,
+        search: searchTerm.trim() || undefined,
+    });
     const deleteBooking = useDeleteBooking();
     const updateBooking = useUpdateBooking();
 
@@ -53,14 +58,10 @@ export default function BookingManagementPage() {
         });
     };
 
-    const filteredBookings = bookings?.filter(b => {
-        const guestName = `${(b.user as any)?.first_name || ''} ${(b.user as any)?.last_name || ''}`.toLowerCase();
-        const matchesSearch =
-            b._id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            guestName.includes(searchTerm.toLowerCase());
+    const filteredBookings = bookings?.filter((b) => {
         const typeValue = b.customTrip ? 'custom' : (b.bookingType || '').toLowerCase();
         const matchesType = filterType === 'All' || typeValue === filterType.toLowerCase();
-        return matchesSearch && matchesType;
+        return matchesType;
     });
 
     const handleDelete = async (id: string) => {
@@ -107,7 +108,7 @@ export default function BookingManagementPage() {
                 </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 bg-surface-light p-4 rounded-2xl border border-surface-border shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 bg-surface-light p-4 rounded-2xl border border-surface-border shadow-sm">
                 <div className="md:col-span-2 relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" size={18} />
                     <input
@@ -116,6 +117,20 @@ export default function BookingManagementPage() {
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
+                </div>
+                <div>
+                    <select
+                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                        value={lifecycleFilter}
+                        onChange={(e) => setLifecycleFilter(e.target.value)}
+                    >
+                        <option value="">All lifecycle</option>
+                        <option value="pending">Pending</option>
+                        <option value="confirmed">Confirmed</option>
+                        <option value="in_progress">In progress</option>
+                        <option value="completed">Completed</option>
+                        <option value="cancelled">Cancelled</option>
+                    </select>
                 </div>
                 <div>
                     <select
@@ -130,7 +145,7 @@ export default function BookingManagementPage() {
                         <option value="custom">Custom Trip</option>
                     </select>
                 </div>
-                <div className="flex items-center justify-center text-xs font-bold text-muted-foreground uppercase opacity-50">
+                <div className="flex items-center justify-center text-xs font-bold text-muted-foreground uppercase opacity-50 md:col-span-2">
                     {filteredBookings?.length || 0} Results
                 </div>
             </div>
@@ -155,7 +170,8 @@ export default function BookingManagementPage() {
                             ) : filteredBookings?.map((booking) => (
                                 <tr key={booking._id} className="hover:bg-surface-dark/10 transition-colors group">
                                     <td className="px-6 py-4 font-mono text-xs text-white">
-                                        #{booking._id.slice(-8).toUpperCase()}
+                                        {(booking as { bookingNumber?: string }).bookingNumber ||
+                                            `#${booking._id.slice(-8).toUpperCase()}`}
                                     </td>
                                     <td className="px-6 py-4 text-sm font-bold text-neutral-300">
                                         {(booking.user as any)?.first_name || 'Guest'} {(booking.user as any)?.last_name || ''}
@@ -198,12 +214,12 @@ export default function BookingManagementPage() {
                                                     Propose Price
                                                 </Button>
                                             )}
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                                onClick={() => setDetailBooking(booking)}
-                                            >
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                                    onClick={() => setDetailBookingId(booking._id)}
+                                                >
                                                 <Eye size={16} />
                                             </Button>
                                             <Button variant="ghost" size="icon" className="h-8 w-8 text-error hover:bg-error/10" onClick={() => handleDelete(booking._id)}>
@@ -282,42 +298,10 @@ export default function BookingManagementPage() {
                 </div>
             )}
 
-            {detailBooking && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-                    <div className="bg-surface-light border border-surface-border rounded-3xl p-8 w-full max-w-2xl space-y-6 shadow-2xl">
-                        <div className="flex items-center justify-between">
-                            <div>
-                                <h3 className="text-xl font-bold text-white">Booking Details</h3>
-                                <p className="text-sm text-neutral-400">#{detailBooking._id.slice(-8).toUpperCase()}</p>
-                            </div>
-                            <Button variant="ghost" onClick={() => setDetailBooking(null)}>Close</Button>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><p className="text-neutral-500">Guest</p><p className="font-bold text-white">{(detailBooking.user as any)?.first_name || 'Guest'} {(detailBooking.user as any)?.last_name || ''}</p></div>
-                            <div><p className="text-neutral-500">Status</p><p className="font-bold uppercase text-white">{detailBooking.status}</p></div>
-                            <div><p className="text-neutral-500">Type</p><p className="font-bold uppercase text-white">{detailBooking.customTrip ? 'custom' : detailBooking.bookingType}</p></div>
-                            <div><p className="text-neutral-500">Price</p><p className="font-bold text-white">{detailBooking.totalPrice > 0 ? `$${detailBooking.totalPrice}` : 'TBD'}</p></div>
-                            <div><p className="text-neutral-500">Check-in / Booking Date</p><p className="font-bold text-white">{detailBooking.checkInDate || detailBooking.bookingDate || 'N/A'}</p></div>
-                            <div><p className="text-neutral-500">Check-out</p><p className="font-bold text-white">{detailBooking.checkOutDate || 'N/A'}</p></div>
-                        </div>
-
-                        {detailBooking.customTrip && (
-                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
-                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Custom Trip</p>
-                                <p className="text-sm text-white">Days: {typeof detailBooking.customTrip === 'string' ? '-' : (detailBooking.customTrip.days || 0)}</p>
-                            </div>
-                        )}
-
-                        {detailBooking.notes && (
-                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
-                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Notes</p>
-                                <p className="text-sm text-white">{detailBooking.notes}</p>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            <AdminBookingDetailModal
+                bookingId={detailBookingId}
+                onClose={() => setDetailBookingId(null)}
+            />
         </div>
     );
 }

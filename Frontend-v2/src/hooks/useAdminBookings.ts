@@ -2,14 +2,18 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from '@/api/client';
 import toast from 'react-hot-toast';
 import type { Booking } from '@/types';
+import { bookingsApi } from '@/api/bookings';
 
-export function useAdminBookings() {
+export type AdminBookingFilters = {
+    lifecycleStatus?: string;
+    workflowStatus?: string;
+    search?: string;
+};
+
+export function useAdminBookings(filters: AdminBookingFilters = {}) {
     return useQuery({
-        queryKey: ['admin', 'bookings'],
-        queryFn: async () => {
-            const { data } = await apiClient.get('/bookings');
-            return data as Booking[];
-        },
+        queryKey: ['admin', 'bookings', filters],
+        queryFn: async () => bookingsApi.adminList(filters),
     });
 }
 
@@ -18,7 +22,7 @@ export function useDeleteBooking() {
     return useMutation({
         mutationFn: (id: string) => apiClient.delete(`/bookings/${id}`),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+            queryClient.invalidateQueries({ queryKey: ['admin'], exact: false });
             toast.success('Booking deleted');
         },
         onError: () => toast.error('Failed to delete booking'),
@@ -30,7 +34,7 @@ export function useUpdateBooking() {
         mutationFn: ({ id, payload }: { id: string; payload: any }) =>
             apiClient.put(`/bookings/${id}`, payload),
         onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: ['admin', 'bookings'] });
+            queryClient.invalidateQueries({ queryKey: ['admin'], exact: false });
             queryClient.invalidateQueries({ queryKey: ['customTripRequests'] });
             queryClient.invalidateQueries({ queryKey: ['bookings', 'user'] });
             toast.success('Booking updated');

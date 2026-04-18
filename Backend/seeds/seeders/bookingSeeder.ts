@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import Booking from '../../models/bookingModel';
 import Tour from '../../models/tourModel';
-import { calculatePackageQuote } from '../../modules/packages/services/pricingService';
+import { buildTourPricingSnapshot } from '../../modules/bookings/pricing/bookingPricingService';
+import { syncBookingPaymentFields } from '../../modules/bookings/payments/bookingPaymentService';
+import { generateBookingNumber } from '../../modules/bookings/services/bookingNumberService';
 
 type CustomerUser = { _id: mongoose.Types.ObjectId; email?: string };
 
@@ -146,12 +148,98 @@ export async function seedBookings(params: {
         const travelDate = new Date();
         travelDate.setDate(travelDate.getDate() + 45);
 
-        const quote = calculatePackageQuote(tourDoc, {
-            guests: def.guests,
-            children: def.children ?? 0,
-            travelDate,
-            selectedAddonNames: def.addonNames ?? [],
-        });
+        const { snapshot, quote, addOnLines } = buildTourPricingSnapshot(
+            tourDoc,
+            {
+                guests: def.guests,
+                children: def.children ?? 0,
+                travelDate,
+                selectedAddonNames: def.addonNames ?? [],
+            },
+            String(tourId)
+        );
+
+        const bookingDate = new Date();
+        if (def.createdDaysAgo != null) {
+            bookingDate.setDate(bookingDate.getDate() - def.createdDaysAgo);
+        }
+
+        const lifecycleStatus =
+            def.status === 'confirmed'
+                ? 'confirmed'
+                : def.status === 'cancelled'
+                  ? 'cancelled'
+                  : 'pending';
+
+        const departureOid = def.departureSku ? params.departureBySku.get(def.departureSku) : undefined;
+
+        const inventoryPhase = departureOid
+            ? lifecycleStatus === 'confirmed'
+                ? 'confirmed'
+                : lifecycleStatus === 'cancelled'
+                  ? 'released'
+                  : 'reserved'
+            : 'none';
+
+        const ledgerMethod =
+            def.paymentMethod === 'credit card' || def.paymentMethod === 'card'
+                ? 'stripe'
+                : def.paymentMethod === 'paypal'
+                  ? 'paypal'
+                  : def.paymentMethod === 'cash'
+                    ? 'cash'
+                    : 'bank_transfer';
+
+        const ledgerProvider =
+            ledgerMethod === 'stripe'
+                ? 'stripe'
+                : ledgerMethod === 'paypal'
+                  ? 'paypal'
+                  : ledgerMethod === 'cash'
+                    ? 'cash'
+                    : 'bank_transfer';
+
+        const paymentLedger: Record<string, unknown>[] = [];
+        if (def.paymentStatus === 'unpaid') {
+            paymentLedger.push({
+                paymentType: 'deposit',
+                amount: quote.deposit,
+                currency: quote.currency,
+                method: ledgerMethod,
+                status: 'pending',
+                provider: ledgerProvider,
+            });
+        } else if (def.paymentStatus === 'partial') {
+            paymentLedger.push({
+                paymentType: 'deposit',
+                amount: quote.deposit,
+                currency: quote.currency,
+                method: ledgerMethod,
+                status: 'completed',
+                provider: ledgerProvider,
+                paidAt: bookingDate,
+            });
+            paymentLedger.push({
+                paymentType: 'balance',
+                amount: Math.max(0, quote.total - quote.deposit),
+                currency: quote.currency,
+                method: ledgerMethod,
+                status: 'pending',
+                provider: ledgerProvider,
+            });
+        } else {
+            paymentLedger.push({
+                paymentType: 'balance',
+                amount: quote.total,
+                currency: quote.currency,
+                method: ledgerMethod,
+                status: 'completed',
+                provider: ledgerProvider,
+                paidAt: bookingDate,
+            });
+        }
+
+        const bookingNumber = await generateBookingNumber();
 
         const persistedAddons =
             def.addonNames?.map((name) => {
@@ -159,12 +247,7 @@ export async function seedBookings(params: {
                 return { name, price: Number(addon?.price ?? 0) };
             }) ?? [];
 
-        const departureId = def.departureSku ? params.departureBySku.get(def.departureSku) : undefined;
-
-        const bookingDate = new Date();
-        if (def.createdDaysAgo != null) {
-            bookingDate.setDate(bookingDate.getDate() - def.createdDaysAgo);
-        }
+        const departureId = departureOid;
 
         const history = [
             {
@@ -205,12 +288,27 @@ export async function seedBookings(params: {
                 guests: def.guests,
                 children: def.children ?? 0,
             },
+            pricingSnapshot: snapshot,
+            addOnLines: addOnLines.length ? addOnLines : undefined,
+            bookingNumber,
+            lifecycleStatus,
+            inventoryPhase,
+            workflow: {
+                workflowStatus: 'intake',
+                voucherIssued: false,
+                documentsSent: false,
+                operationsAssigned: false,
+            },
+            schemaVersion: 2,
+            paymentLedger,
             selectedAddons: persistedAddons.length ? persistedAddons : undefined,
             departureId,
             history,
         };
 
         const booking = await Booking.create(doc);
+        syncBookingPaymentFields(booking as any);
+        await booking.save();
         created.push(booking._id as mongoose.Types.ObjectId);
 
         if (def.createdDaysAgo != null) {

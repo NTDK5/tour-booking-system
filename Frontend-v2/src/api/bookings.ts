@@ -35,4 +35,32 @@ export const bookingsApi = {
     remove: async (bookingId: string): Promise<void> => {
         await apiClient.delete(`/bookings/${bookingId}`);
     },
+
+    /** Admin enterprise list */
+    adminList: async (params?: {
+        lifecycleStatus?: string;
+        workflowStatus?: string;
+        search?: string;
+    }): Promise<Booking[]> => {
+        const { data } = await apiClient.get('/admin/bookings', {
+            params: Object.fromEntries(
+                Object.entries(params || {}).filter(([, v]) => v !== undefined && v !== '')
+            ),
+        });
+        return data;
+    },
+
+    adminGetById: async (id: string): Promise<Booking> => {
+        const { data } = await apiClient.get(`/admin/bookings/${id}`);
+        return data;
+    },
+
+    /** Customer — Stripe PaymentIntent for remaining balance */
+    payBalance: async (
+        bookingId: string,
+        amount: number
+    ): Promise<{ clientSecret: string | null }> => {
+        const { data } = await apiClient.post(`/bookings/${bookingId}/payments/balance`, { amount });
+        return data;
+    },
 };

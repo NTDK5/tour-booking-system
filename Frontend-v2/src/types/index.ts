@@ -104,8 +104,74 @@ export interface Car {
     updatedAt: string;
 }
 
+export interface BookingPaymentSummary {
+    totalPaid: number;
+    balanceDue: number;
+    paymentStatus: 'unpaid' | 'partial' | 'paid';
+}
+
+export interface PaymentLedgerEntry {
+    _id?: string;
+    paymentType?: 'deposit' | 'balance' | 'refund' | 'adjustment';
+    amount: number;
+    currency?: string;
+    method?: string;
+    status?: 'pending' | 'completed' | 'failed' | 'cancelled';
+    transactionReference?: string;
+    provider?: string;
+    paidAt?: string;
+    notes?: string;
+}
+
+export interface PricingSnapshot {
+    baseAmount?: number;
+    groupDiscountAmount?: number;
+    seasonalAdjustmentAmount?: number;
+    addOnsTotal?: number;
+    subtotal: number;
+    depositAmount?: number;
+    totalAmount: number;
+    currency?: string;
+    lines?: { label: string; amount: number }[];
+}
+
+export interface BookingTraveler {
+    fullName: string;
+    travelerType?: 'adult' | 'child' | 'infant';
+    passportNumber?: string;
+    nationality?: string;
+}
+
 export interface Booking {
     _id: string;
+    /** Enterprise human-readable ref */
+    bookingNumber?: string;
+    lifecycleStatus?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+    inventoryPhase?: 'none' | 'reserved' | 'confirmed' | 'released';
+    pricingSnapshot?: PricingSnapshot;
+    paymentLedger?: PaymentLedgerEntry[];
+    paymentSummary?: BookingPaymentSummary;
+    travelers?: BookingTraveler[];
+    workflow?: {
+        workflowStatus?: string;
+        voucherIssued?: boolean;
+        documentsSent?: boolean;
+        operationsAssigned?: boolean;
+    };
+    documents?: {
+        voucherUrl?: string;
+        invoiceUrl?: string;
+        receiptUrls?: string[];
+    };
+    auditTrail?: {
+        action: string;
+        timestamp?: string;
+        notes?: string;
+        metadata?: Record<string, unknown>;
+    }[];
+    assignedGuide?: unknown;
+    assignedVehicle?: unknown;
+    assignedHotels?: { lodgeId?: string; name?: string; destination?: string }[];
     user?: string | User;
     tour?: string | Tour;
     lodge?: string | Lodge;
@@ -124,7 +190,7 @@ export interface Booking {
     totalPrice: number;
     status?: BookingStatus;
     travelerDetails?: TravelerDetails;
-    paymentStatus?: 'pending' | 'paid' | 'refunded' | 'unpaid';
+    paymentStatus?: 'pending' | 'paid' | 'refunded' | 'unpaid' | 'partial';
     paymentMethod?: string;
     notes?: string;
     proposedPrice?: number;

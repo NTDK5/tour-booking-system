@@ -132,7 +132,8 @@ export default function BookingHistoryPage() {
                                         {bookingTitle}
                                     </h3>
                                     <p className="text-xs text-neutral-500">
-                                        Booking ID: #{booking._id.slice(-8).toUpperCase()}
+                                        Ref:{' '}
+                                        {booking.bookingNumber || `#${booking._id.slice(-8).toUpperCase()}`}
                                     </p>
                                 </div>
                                 <Badge variant={
@@ -239,13 +240,51 @@ export default function BookingHistoryPage() {
                             <Button variant="ghost" size="sm" onClick={() => setSelectedBooking(null)}>Close</Button>
                         </div>
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><span className="text-neutral-500">Booking ID</span><p className="font-bold">#{selectedBooking._id.slice(-8).toUpperCase()}</p></div>
+                            <div><span className="text-neutral-500">Booking ref</span><p className="font-bold">{selectedBooking.bookingNumber || `#${selectedBooking._id.slice(-8).toUpperCase()}`}</p></div>
                             <div><span className="text-neutral-500">Status</span><p className="font-bold uppercase">{selectedBooking.status}</p></div>
+                            <div><span className="text-neutral-500">Lifecycle</span><p className="font-bold uppercase">{selectedBooking.lifecycleStatus || '—'}</p></div>
                             <div><span className="text-neutral-500">Type</span><p className="font-bold uppercase">{getBookingKind(selectedBooking)}</p></div>
                             <div><span className="text-neutral-500">Total Price</span><p className="font-bold">{selectedBooking.totalPrice > 0 ? `$${selectedBooking.totalPrice}` : 'TBD'}</p></div>
+                            <div><span className="text-neutral-500">Balance due</span><p className="font-bold text-amber-300">${selectedBooking.paymentSummary?.balanceDue?.toFixed(2) ?? '—'}</p></div>
+                            <div><span className="text-neutral-500">Paid to date</span><p className="font-bold">${selectedBooking.paymentSummary?.totalPaid?.toFixed(2) ?? '0'}</p></div>
+                            <div><span className="text-neutral-500">Payment state</span><p className="font-bold uppercase">{selectedBooking.paymentSummary?.paymentStatus || selectedBooking.paymentStatus}</p></div>
                             <div><span className="text-neutral-500">Start</span><p className="font-bold">{selectedBooking.checkInDate || selectedBooking.bookingDate || 'N/A'}</p></div>
                             <div><span className="text-neutral-500">End</span><p className="font-bold">{selectedBooking.checkOutDate || 'N/A'}</p></div>
                         </div>
+                        {selectedBooking.paymentLedger && selectedBooking.paymentLedger.length > 0 && (
+                            <div className="rounded-xl border border-surface-border overflow-hidden">
+                                <p className="text-xs uppercase text-neutral-500 font-bold px-4 py-2 bg-surface-dark/50">Payment activity</p>
+                                <table className="w-full text-xs">
+                                    <thead>
+                                        <tr className="text-left text-neutral-500 border-b border-surface-border">
+                                            <th className="px-4 py-2">Type</th>
+                                            <th className="px-4 py-2">Amount</th>
+                                            <th className="px-4 py-2">Status</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {selectedBooking.paymentLedger.map((row: any, i: number) => (
+                                            <tr key={row._id || i} className="border-b border-surface-border/60">
+                                                <td className="px-4 py-2 capitalize">{row.paymentType}</td>
+                                                <td className="px-4 py-2 font-mono">${Number(row.amount).toFixed(2)}</td>
+                                                <td className="px-4 py-2">{row.status}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                        {(selectedBooking.documents?.voucherUrl || selectedBooking.documents?.invoiceUrl) && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border space-y-2 text-sm">
+                                <p className="text-xs uppercase text-neutral-500 font-bold">Documents</p>
+                                {selectedBooking.documents?.voucherUrl && (
+                                    <p className="text-primary truncate">{selectedBooking.documents.voucherUrl}</p>
+                                )}
+                                {selectedBooking.documents?.invoiceUrl && (
+                                    <p className="text-primary truncate">{selectedBooking.documents.invoiceUrl}</p>
+                                )}
+                            </div>
+                        )}
                         {selectedBooking.customCarRequest && (
                             <div className="p-4 rounded-xl bg-surface border border-surface-border">
                                 <p className="text-xs uppercase text-neutral-500 font-bold">Custom Car Request</p>

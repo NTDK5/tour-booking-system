@@ -1,6 +1,7 @@
 import PackageDeparture from '../models/packageDepartureModel';
 import type { Document } from 'mongoose';
 import { startOfDay } from 'date-fns';
+import { occupiedSeats } from '../../bookings/services/bookingInventoryService';
 
 export interface AvailabilityCheckInput {
     packageId: string;
@@ -38,7 +39,7 @@ export async function checkPackageAvailability(
         const starts = new Date(dep.startsAt);
         const cutoff = new Date(starts.getTime() - cutoffHours * 60 * 60 * 1000);
         if (new Date() > cutoff) reasons.push('Booking cutoff passed for this departure');
-        if ((dep.bookedCount || 0) + input.guests > dep.capacity) reasons.push('Not enough seats on this departure');
+        if (occupiedSeats(dep as any) + input.guests > dep.capacity) reasons.push('Not enough seats on this departure');
         return {
             available: reasons.length === 0,
             reasons,

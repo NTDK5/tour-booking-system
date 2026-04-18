@@ -1,13 +1,12 @@
 import { Request, Response } from 'express';
+import mongoose from 'mongoose';
 import asyncHandler from 'express-async-handler';
 import paypal from '@paypal/checkout-server-sdk';
 import Stripe from 'stripe';
 import { client } from '../utils/paypalClient';
 import Booking from '../models/bookingModel';
 import Payment from '../models/paymentModel';
-import Tour from '../models/tourModel';
-import Lodge from '../models/lodgeModel';
-import Car from '../models/carModel';
+import { applyGatewayPaymentSuccess } from '../modules/bookings/payments/bookingPaymentService';
 import logger from '../utils/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -74,29 +73,36 @@ export const capturePayPalPayment = asyncHandler(async (req: any, res: any) => {
             throw new Error('Booking not found');
         }
 
-        // Idempotency: skip if already confirmed
-        if (booking.status === 'confirmed') {
-            res.json({ message: 'Booking already confirmed', result: capture.result });
+        const txRef = `pp_${orderID}`;
+        const already = booking.paymentLedger?.some(
+            (e: any) => e.transactionReference === txRef && e.status === 'completed'
+        );
+        if (already) {
+            res.json({ message: 'Payment already recorded', result: capture.result });
             return;
         }
 
         const captureDetails = purchaseUnit.payments.captures[0];
 
-        // Create Payment record
         const payment = await Payment.create({
-            amount: captureDetails.amount.value,
+            amount: Number(captureDetails.amount.value),
             booking: bookingId,
             status: 'completed',
             provider: 'paypal',
-            txRef: `pp_${orderID}`,
+            txRef,
             transactionId: capture.result.id,
         });
 
-        // Update Booking
-        booking.status = 'confirmed' as any;
-        booking.paymentId = payment._id as any;
-        await booking.save();
+        await applyGatewayPaymentSuccess(booking, {
+            amount: Number(captureDetails.amount.value),
+            currency: captureDetails.amount.currency_code || 'USD',
+            provider: 'paypal',
+            txRef,
+            transactionId: capture.result.id,
+            legacyPaymentId: payment._id as mongoose.Types.ObjectId,
+        });
 
+        await booking.save();
         logger.info(`PayPal Payment captured for booking: ${bookingId}`);
         res.json(capture.result);
     } catch (err: any) {
@@ -168,19 +174,39 @@ export const handleStripeWebhook = async (req: any, res: any) => {
                 return res.status(404).send('Booking not found');
             }
 
-            // Idempotency check
-            if (booking.status === 'confirmed') {
-                logger.info(`Booking ${bookingId} already confirmed, skipping.`);
+            const txRef = `st_${intent.id}`;
+            const already = booking.paymentLedger?.some(
+                (e: any) => e.transactionReference === txRef && e.status === 'completed'
+            );
+            if (already) {
+                logger.info(`Stripe payment ${intent.id} already recorded for booking ${bookingId}.`);
                 return res.json({ received: true });
             }
 
-            await Payment.findOneAndUpdate(
-                { stripePaymentIntentId: intent.id },
-                { status: 'completed' },
-                { upsert: true }
-            );
+            let paymentDoc = await Payment.findOne({ stripePaymentIntentId: intent.id });
+            if (paymentDoc) {
+                paymentDoc.status = 'completed';
+                await paymentDoc.save();
+            } else {
+                paymentDoc = await Payment.create({
+                    amount: intent.amount_received ? intent.amount_received / 100 : intent.amount / 100,
+                    booking: bookingId,
+                    status: 'completed',
+                    provider: 'stripe',
+                    txRef,
+                    stripePaymentIntentId: intent.id,
+                });
+            }
 
-            booking.status = 'confirmed' as any;
+            await applyGatewayPaymentSuccess(booking, {
+                amount: intent.amount_received ? intent.amount_received / 100 : intent.amount / 100,
+                currency: (intent.currency || 'usd').toUpperCase(),
+                provider: 'stripe',
+                txRef,
+                stripePaymentIntentId: intent.id,
+                legacyPaymentId: paymentDoc._id as mongoose.Types.ObjectId,
+            });
+
             await booking.save();
 
             logger.info(`Stripe payment succeeded for booking: ${bookingId}`);

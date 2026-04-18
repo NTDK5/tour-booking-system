@@ -1,6 +1,7 @@
 import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware';
 import adminPackageRoutes from './adminPackageRoutes';
+import adminBookingRoutes from './adminBookingRoutes';
 import {
     getDashboardStats,
     getAvailability,
@@ -33,5 +34,7 @@ router.post('/calendar/check-availability', checkUnifiedResourceAvailability);
 
 /** Tour / package builder API — GET/POST/PATCH `/api/admin/packages`, etc. */
 router.use('/packages', adminPackageRoutes);
+
+router.use('/bookings', adminBookingRoutes);
 
 export default router;
