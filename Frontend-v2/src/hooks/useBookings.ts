@@ -8,6 +8,7 @@ export const bookingKeys = {
     user: () => [...bookingKeys.all, 'user'] as const,
     detail: (id: string) => [...bookingKeys.all, id] as const,
     timeline: (id: string) => [...bookingKeys.all, id, 'timeline'] as const,
+    tourOptions: (tourId: string) => [...bookingKeys.all, 'tour-options', tourId] as const,
 };
 
 export function useUserBookings() {
@@ -35,6 +36,20 @@ export function useCreateBooking() {
             toast.success('Booking created successfully!');
         },
         onError: () => toast.error('Failed to create booking. Please try again.'),
+    });
+}
+
+export function useTourBookingOptions(tourId: string, enabled = true) {
+    return useQuery({
+        queryKey: bookingKeys.tourOptions(tourId),
+        queryFn: () => bookingsApi.getTourOptions(tourId),
+        enabled: enabled && !!tourId,
+    });
+}
+
+export function useBookingQuote() {
+    return useMutation({
+        mutationFn: bookingsApi.quote,
     });
 }
 
@@ -89,5 +104,21 @@ export function useDeleteUserBooking() {
             toast.success('Booking deleted from history.');
         },
         onError: () => toast.error('Failed to delete booking.'),
+    });
+}
+
+export function usePayBookingBalance() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({ bookingId, amount }: { bookingId: string; amount: number }) =>
+            bookingsApi.payBalance(bookingId, amount),
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: bookingKeys.user() });
+            queryClient.invalidateQueries({ queryKey: bookingKeys.detail(variables.bookingId) });
+            toast.success('Payment session created. Complete payment in the Stripe dialog integration step.');
+        },
+        onError: (error: any) => {
+            toast.error(error?.response?.data?.message || 'Failed to start payment.');
+        },
     });
 }

@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 import { X, Calendar, Users, DollarSign, MapPin } from 'lucide-react';
 import { adminApi } from '@/api/admin';
 import toast from 'react-hot-toast';
@@ -34,6 +35,7 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
         register,
         handleSubmit,
         watch,
+        setValue,
         formState: { errors, isSubmitting },
     } = useForm<OfflineBookingValues>({
         resolver: zodResolver(offlineBookingSchema),
@@ -93,14 +95,16 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                         <h4 className="font-semibold text-sm uppercase tracking-wider text-primary">Service Selection</h4>
                         <div className="space-y-2">
                             <label className="text-sm font-medium">Type of Booking</label>
-                            <select
-                                {...register('bookingType')}
-                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border focus:ring-2 focus:ring-primary outline-none text-sm text-white"
-                            >
-                                <option value="Lodge">Lodge Stay</option>
-                                <option value="Tour">Guided Tour</option>
-                                <option value="Car">Car Rental</option>
-                            </select>
+                            <input type="hidden" {...register('bookingType')} />
+                            <AccessibleSelect
+                                value={watch('bookingType')}
+                                onChange={(v) => setValue('bookingType', v as OfflineBookingValues['bookingType'], { shouldValidate: true })}
+                                options={[
+                                    { value: 'Lodge', label: 'Lodge Stay' },
+                                    { value: 'Tour', label: 'Guided Tour' },
+                                    { value: 'Car', label: 'Car Rental' },
+                                ]}
+                            />
                         </div>
                         <Input
                             label="Resource ID / Name"
@@ -161,25 +165,29 @@ export function OfflineBookingForm({ onClose, onSuccess }: OfflineBookingFormPro
                         <div className="grid grid-cols-2 gap-2">
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Status</label>
-                                <select
-                                    {...register('paymentStatus')}
-                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm text-white"
-                                >
-                                    <option value="unpaid">Unpaid</option>
-                                    <option value="partial">Partial</option>
-                                    <option value="paid">Paid</option>
-                                </select>
+                                <input type="hidden" {...register('paymentStatus')} />
+                                <AccessibleSelect
+                                    value={watch('paymentStatus')}
+                                    onChange={(v) => setValue('paymentStatus', v as OfflineBookingValues['paymentStatus'], { shouldValidate: true })}
+                                    options={[
+                                        { value: 'unpaid', label: 'Unpaid' },
+                                        { value: 'partial', label: 'Partial' },
+                                        { value: 'paid', label: 'Paid' },
+                                    ]}
+                                />
                             </div>
                             <div className="space-y-2">
                                 <label className="text-sm font-medium">Method</label>
-                                <select
-                                    {...register('paymentMethod')}
-                                    className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-sm text-white"
-                                >
-                                    <option value="cash">Cash</option>
-                                    <option value="bank transfer">Bank Transfer</option>
-                                    <option value="paypal">Other</option>
-                                </select>
+                                <input type="hidden" {...register('paymentMethod')} />
+                                <AccessibleSelect
+                                    value={watch('paymentMethod')}
+                                    onChange={(v) => setValue('paymentMethod', v as OfflineBookingValues['paymentMethod'], { shouldValidate: true })}
+                                    options={[
+                                        { value: 'cash', label: 'Cash' },
+                                        { value: 'bank transfer', label: 'Bank Transfer' },
+                                        { value: 'paypal', label: 'Other' },
+                                    ]}
+                                />
                             </div>
                         </div>
                     </div>

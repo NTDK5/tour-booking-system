@@ -58,23 +58,26 @@ const buildDateOverlapQuery = (range: DateRange) => {
 const buildResourceQuery = (filters?: { resourceType?: string; resourceId?: string }) => {
     if (!filters?.resourceType && !filters?.resourceId) return {};
 
-    const clauses: any[] = [];
+    const andClauses: any[] = [];
 
     if (filters.resourceType) {
-        clauses.push({ 'resource.resourceType': filters.resourceType });
-        clauses.push({ bookingType: filters.resourceType });
+        andClauses.push({
+            $or: [{ 'resource.resourceType': filters.resourceType }, { bookingType: filters.resourceType }],
+        });
     }
 
     if (filters.resourceId) {
-        clauses.push({ 'resource.resourceId': filters.resourceId });
+        const idClauses: any[] = [{ 'resource.resourceId': filters.resourceId }];
         if (filters.resourceType) {
             const legacyField = getLegacyResourceField(filters.resourceType as ResourceRef['resourceType']);
-            if (legacyField) clauses.push({ [legacyField]: filters.resourceId });
+            if (legacyField) idClauses.push({ [legacyField]: filters.resourceId });
         }
+        andClauses.push({ $or: idClauses });
     }
 
-    if (!clauses.length) return {};
-    return { $or: clauses };
+    if (!andClauses.length) return {};
+    if (andClauses.length === 1) return andClauses[0];
+    return { $and: andClauses };
 };
 
 export const buildOverlapQuery = (resource: ResourceRef, range: DateRange, excludeBookingId?: string) => {

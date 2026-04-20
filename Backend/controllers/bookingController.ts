@@ -21,6 +21,10 @@ import Stripe from 'stripe';
 import Payment from '../models/paymentModel';
 import { derivePaymentTotals } from '../modules/bookings/payments/bookingPaymentService';
 import { paymentSummaryFromBooking } from '../modules/bookings/dto/bookingDto';
+import PackageDeparture from '../modules/packages/models/packageDepartureModel';
+import { checkPackageAvailability } from '../modules/packages/services/availabilityService';
+import { buildTourPricingSnapshot } from '../modules/bookings/pricing/bookingPricingService';
+import { occupiedSeats } from '../modules/bookings/services/bookingInventoryService';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
     apiVersion: '2025-01-27.acacia' as any,
@@ -197,8 +201,6 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
                 String(booking._id)
             );
             if (!availabilityCheck.available && !booking.isRequest) {
-                await session.abortTransaction();
-                session.endSession();
                 res.status(409);
                 throw new Error('Resource is already booked for the selected dates');
             }
@@ -211,7 +213,6 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
         }
 
         await session.commitTransaction();
-        session.endSession();
 
         if (bookingTypeNormalized === 'tour' && booking.tour) {
             try {
@@ -250,10 +251,117 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
 
         res.status(201).json(toSerializableBooking(booking));
     } catch (error) {
-        await session.abortTransaction();
-        session.endSession();
+        if (session.inTransaction()) {
+            await session.abortTransaction();
+        }
         throw error;
+    } finally {
+        session.endSession();
     }
+});
+
+// @desc Quote a tour booking using enterprise pricing rules
+// @route POST /api/bookings/quote
+// @access Private
+export const quoteBooking = asyncHandler(async (req: Request, res: Response) => {
+    const {
+        bookingType,
+        tourId,
+        numberOfPeople = 1,
+        children = 0,
+        bookingDate,
+        selectedAddons = [],
+        departureId,
+    } = req.body as Record<string, any>;
+
+    if (String(bookingType || '').toLowerCase() !== 'tour') {
+        res.status(400);
+        throw new Error('Only tour quote is supported');
+    }
+
+    const tour = await Tour.findById(tourId);
+    if (!tour) {
+        res.status(404);
+        throw new Error('Tour not found');
+    }
+
+    const addonNames: string[] =
+        Array.isArray(selectedAddons) && selectedAddons.length
+            ? selectedAddons
+                  .map((a: any) => (typeof a === 'string' ? a : a?.name))
+                  .filter(Boolean)
+            : [];
+
+    const guests = Math.max(1, Number(numberOfPeople) || 1);
+    const childCount = Math.max(0, Math.min(Number(children) || 0, guests));
+
+    const availability = await checkPackageAvailability(tour, {
+        packageId: String(tourId),
+        departureId: departureId ? String(departureId) : undefined,
+        guests,
+        bookingDate: bookingDate ? new Date(bookingDate) : undefined,
+    });
+
+    const { snapshot, quote, addOnLines } = buildTourPricingSnapshot(
+        tour,
+        {
+            guests,
+            children: childCount,
+            travelDate: bookingDate ? new Date(bookingDate) : undefined,
+            selectedAddonNames: addonNames,
+        },
+        String(tourId)
+    );
+
+    res.status(200).json({
+        available: availability.available,
+        reasons: availability.reasons,
+        quote,
+        pricingSnapshot: snapshot,
+        addOnLines,
+    });
+});
+
+// @desc Get tour booking options for customer checkout
+// @route GET /api/bookings/options/tour/:tourId
+// @access Private
+export const getTourBookingOptions = asyncHandler(async (req: Request, res: Response) => {
+    const { tourId } = req.params;
+    const tour = await Tour.findById(tourId).lean();
+    if (!tour) {
+        res.status(404);
+        throw new Error('Tour not found');
+    }
+
+    const now = new Date();
+    const departures = await PackageDeparture.find({
+        packageId: tour._id,
+        status: { $in: ['open', 'scheduled'] },
+        startsAt: { $gte: now },
+    })
+        .sort({ startsAt: 1 })
+        .limit(20)
+        .lean();
+
+    res.status(200).json({
+        addons: Array.isArray((tour as any).addons) ? (tour as any).addons : [],
+        departures: departures.map((dep: any) => {
+            const occupied = occupiedSeats(dep);
+            const seatsLeft = Math.max(0, (dep.capacity || 0) - occupied);
+            return {
+                _id: dep._id,
+                sku: dep.sku,
+                startsAt: dep.startsAt,
+                endsAt: dep.endsAt,
+                status: dep.status,
+                capacity: dep.capacity,
+                reservedGuests: dep.reservedGuests || 0,
+                confirmedGuests: dep.confirmedGuests || 0,
+                seatsLeft,
+            };
+        }),
+        bookingCutoffHours: (tour as any).bookingCutoffHours ?? 24,
+    });
 });
 
 // @desc Get all bookings

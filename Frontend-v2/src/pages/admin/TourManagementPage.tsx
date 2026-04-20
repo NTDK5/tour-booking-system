@@ -5,6 +5,7 @@ import {
     Plus,
     Edit,
     Trash2,
+    Eye,
     Users,
     Clock,
     MapPin,
@@ -30,8 +31,17 @@ function mapAdminRowToTour(t: Record<string, any>): Tour {
         description: t.description || t.fullDescription || '',
         destination: dest,
         duration: typeof days === 'number' ? days : 1,
+        durationDetails: t.duration && typeof t.duration === 'object' ? t.duration : undefined,
+        destinations: Array.isArray(t.destinations) ? t.destinations : undefined,
         groupSize: t.maxGuests ?? t.groupSize ?? 10,
+        minGuests: t.minGuests ?? undefined,
+        maxGuests: t.maxGuests ?? t.groupSize ?? undefined,
+        bookingCutoffHours: t.bookingCutoffHours ?? undefined,
         price: t.basePrice ?? t.price ?? 0,
+        basePrice: t.basePrice ?? t.price ?? 0,
+        pricingType: t.pricingType ?? 'per_person',
+        depositPercent: t.depositPercent ?? 20,
+        addons: Array.isArray(t.addons) ? t.addons : [],
         images: t.gallery || t.images || t.imageUrl || [],
         highlights: t.highlights || [],
         included: t.included || [],
@@ -52,6 +62,7 @@ export default function TourManagementPage() {
     const queryClient = useQueryClient();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
+    const [detailTour, setDetailTour] = useState<Tour | null>(null);
 
     const { data: toursData, isLoading, error } = useQuery({
         queryKey: ['admin-packages'],
@@ -110,12 +121,19 @@ export default function TourManagementPage() {
                     }}
                 />
             )}
+            {detailTour && (
+                <TourDetailsModal
+                    tour={detailTour}
+                    onClose={() => setDetailTour(null)}
+                />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {isLoading ? (
                     [...Array(6)].map((_, i) => <Skeleton key={i} className="h-[300px] rounded-2xl" />)
                 ) : toursData?.data.map((raw) => {
                     const tour = mapAdminRowToTour(raw as Record<string, any>);
+                    const durationText = `${tour.duration}D${tour.durationDetails?.nights != null ? ` / ${tour.durationDetails.nights}N` : ''}`;
                     return (
                     <div key={tour._id} className="bg-surface-light border border-surface-border rounded-2xl overflow-hidden shadow-sm hover:shadow-md transition-all hover:border-primary/50 flex flex-col group">
                         <div className="p-6 flex-grow">
@@ -140,29 +158,48 @@ export default function TourManagementPage() {
                                         <Clock size={16} />
                                         <span>Duration</span>
                                     </div>
-                                    <span className="font-semibold">{tour.duration} Days</span>
+                                    <span className="font-semibold">{durationText}</span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <Users size={16} />
                                         <span>Capacity</span>
                                     </div>
-                                    <span className="font-semibold">{tour.groupSize} People</span>
+                                    <span className="font-semibold">
+                                        {tour.minGuests ? `${tour.minGuests}-${tour.maxGuests || tour.groupSize}` : `${tour.groupSize}`} People
+                                    </span>
                                 </div>
                                 <div className="flex items-center justify-between text-sm">
                                     <div className="flex items-center gap-2 text-muted-foreground">
                                         <Activity size={16} />
                                         <span>Price</span>
                                     </div>
-                                    <span className="font-bold text-primary">${tour.price}</span>
+                                    <span className="font-bold text-primary">${tour.basePrice || tour.price}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <span>Pricing</span>
+                                    </div>
+                                    <span className="font-semibold">{tour.pricingType}</span>
+                                </div>
+                                <div className="flex items-center justify-between text-sm">
+                                    <div className="flex items-center gap-2 text-muted-foreground">
+                                        <span>Deposit/Cutoff</span>
+                                    </div>
+                                    <span className="font-semibold">{tour.depositPercent ?? 20}% · {tour.bookingCutoffHours ?? 24}h</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="px-6 py-4 bg-surface-dark/20 border-t border-surface-border flex items-center justify-between">
-                            <Button variant="outline" size="sm" className="gap-2 text-[10px] h-8 uppercase font-bold tracking-wider">
-                                <Calendar size={14} />
-                                Itinerary
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-2 text-[10px] h-8 uppercase font-bold tracking-wider"
+                                onClick={() => setDetailTour(tour)}
+                            >
+                                <Eye size={14} />
+                                Full Details
                             </Button>
                             <div className="flex gap-1">
                                 <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-primary/10 hover:text-primary" onClick={() => handleEdit(tour)}>
@@ -184,6 +221,96 @@ export default function TourManagementPage() {
                     <Button onClick={handleCreate} className="mt-4" variant="outline">+ Add Your First Tour</Button>
                 </div>
             )}
+        </div>
+    );
+}
+
+function TourDetailsModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
+    const itineraryPreview = (tour.itinerary || []).slice(0, 8);
+    return (
+        <div className="fixed inset-0 z-[150] bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
+            <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl border border-surface-border bg-surface-light shadow-2xl">
+                <div className="px-6 py-4 border-b border-surface-border flex items-center justify-between">
+                    <div>
+                        <h3 className="text-xl font-bold text-white">{tour.title}</h3>
+                        <p className="text-sm text-neutral-400">{tour.destination}</p>
+                    </div>
+                    <Button variant="ghost" onClick={onClose}>Close</Button>
+                </div>
+                <div className="p-6 overflow-y-auto max-h-[calc(90vh-80px)] space-y-6">
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <Metric label="Duration" value={`${tour.duration} days${tour.durationDetails?.nights != null ? ` / ${tour.durationDetails.nights} nights` : ''}`} />
+                        <Metric label="Guests" value={tour.minGuests ? `${tour.minGuests}-${tour.maxGuests || tour.groupSize}` : `${tour.groupSize}`} />
+                        <Metric label="Pricing" value={`${tour.pricingType || 'per_person'} · $${tour.basePrice || tour.price}`} />
+                        <Metric label="Deposit" value={`${tour.depositPercent ?? 20}%`} />
+                        <Metric label="Cutoff" value={`${tour.bookingCutoffHours ?? 24}h`} />
+                        <Metric label="Add-ons" value={`${tour.addons?.length || 0}`} />
+                    </div>
+
+                    {!!tour.description && (
+                        <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4">
+                            <h4 className="font-semibold mb-2">Description</h4>
+                            <p className="text-sm text-neutral-300 whitespace-pre-line">{tour.description}</p>
+                        </section>
+                    )}
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4">
+                            <h4 className="font-semibold mb-2">Included</h4>
+                            <ul className="text-sm text-neutral-300 space-y-1">
+                                {(tour.included || []).map((line, idx) => <li key={idx}>- {line}</li>)}
+                                {!tour.included?.length && <li>No inclusions listed.</li>}
+                            </ul>
+                        </section>
+                        <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4">
+                            <h4 className="font-semibold mb-2">Excluded</h4>
+                            <ul className="text-sm text-neutral-300 space-y-1">
+                                {(tour.excluded || []).map((line, idx) => <li key={idx}>- {line}</li>)}
+                                {!tour.excluded?.length && <li>No exclusions listed.</li>}
+                            </ul>
+                        </section>
+                    </div>
+
+                    <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4">
+                        <h4 className="font-semibold mb-2">Add-ons</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                            {(tour.addons || []).map((addon, idx) => (
+                                <div key={idx} className="rounded-lg border border-surface-border px-3 py-2 text-sm flex items-center justify-between">
+                                    <span>{addon.name}</span>
+                                    <span className="text-primary font-semibold">${addon.price}</span>
+                                </div>
+                            ))}
+                            {!tour.addons?.length && <p className="text-sm text-neutral-400">No add-ons configured.</p>}
+                        </div>
+                    </section>
+
+                    <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4">
+                        <h4 className="font-semibold mb-2">Itinerary Preview</h4>
+                        <div className="space-y-2">
+                            {itineraryPreview.map((day: any, idx) => (
+                                <div key={idx} className="rounded-lg border border-surface-border px-3 py-2">
+                                    <p className="text-sm font-semibold text-white">
+                                        Day {day.day || idx + 1}: {day.title || 'Untitled'}
+                                    </p>
+                                    {!!day.description && (
+                                        <p className="text-xs text-neutral-400 mt-1 line-clamp-3">{day.description}</p>
+                                    )}
+                                </div>
+                            ))}
+                            {!itineraryPreview.length && <p className="text-sm text-neutral-400">No itinerary configured.</p>}
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+    return (
+        <div className="rounded-xl border border-surface-border bg-surface-dark/30 p-3">
+            <p className="text-xs uppercase text-neutral-500">{label}</p>
+            <p className="text-base font-semibold text-white mt-1">{value}</p>
         </div>
     );
 }

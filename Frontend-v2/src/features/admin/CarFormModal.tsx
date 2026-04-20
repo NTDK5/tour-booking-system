@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Save } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 import type { Car } from '@/types';
 
 interface CarFormModalProps {
@@ -103,25 +104,25 @@ export function CarFormModal({ car, onClose, onSave, isLoading }: CarFormModalPr
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Transmission</label>
-                            <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                            <AccessibleSelect
                                 value={formData.transmission}
-                                onChange={e => setFormData({ ...formData, transmission: e.target.value as any })}
-                            >
-                                <option value="manual">Manual</option>
-                                <option value="automatic">Automatic</option>
-                            </select>
+                                onChange={v => setFormData({ ...formData, transmission: v as any })}
+                                options={[
+                                    { value: 'manual', label: 'Manual' },
+                                    { value: 'automatic', label: 'Automatic' },
+                                ]}
+                            />
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Fuel Type</label>
-                            <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                            <AccessibleSelect
                                 value={formData.fuelType}
-                                onChange={e => setFormData({ ...formData, fuelType: e.target.value as any })}
-                            >
-                                <option value="diesel">Diesel</option>
-                                <option value="petrol">Petrol</option>
-                            </select>
+                                onChange={v => setFormData({ ...formData, fuelType: v as any })}
+                                options={[
+                                    { value: 'diesel', label: 'Diesel' },
+                                    { value: 'petrol', label: 'Petrol' },
+                                ]}
+                            />
                         </div>
                     </div>
 

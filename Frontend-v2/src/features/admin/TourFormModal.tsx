@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, Save, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 import type { Tour } from '@/types';
 
 interface TourFormModalProps {
@@ -28,7 +29,12 @@ export function TourFormModal({ tour, onClose, onSave, isLoading }: TourFormModa
 
     useEffect(() => {
         if (tour) {
-            setFormData(tour);
+            setFormData({
+                ...tour,
+                duration: Number(tour.durationDetails?.days ?? tour.duration ?? 1),
+                groupSize: Number(tour.maxGuests ?? tour.groupSize ?? 10),
+                price: Number(tour.basePrice ?? tour.price ?? 0),
+            });
         }
     }, [tour]);
 
@@ -95,15 +101,15 @@ export function TourFormModal({ tour, onClose, onSave, isLoading }: TourFormModa
                         </div>
                         <div className="space-y-1.5">
                             <label className="text-xs font-bold uppercase text-muted-foreground">Difficulty</label>
-                            <select
-                                className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                            <AccessibleSelect
                                 value={formData.difficulty}
-                                onChange={e => setFormData({ ...formData, difficulty: e.target.value as any })}
-                            >
-                                <option value="easy">Easy</option>
-                                <option value="moderate">Moderate</option>
-                                <option value="challenging">Challenging</option>
-                            </select>
+                                onChange={v => setFormData({ ...formData, difficulty: v as any })}
+                                options={[
+                                    { value: 'easy', label: 'Easy' },
+                                    { value: 'moderate', label: 'Moderate' },
+                                    { value: 'challenging', label: 'Challenging' },
+                                ]}
+                            />
                         </div>
                     </div>
 

@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { X, Save, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 import { adminPackagesApi } from '@/api/packages';
 import { tourKeys } from '@/hooks/useTours';
 import type { Tour } from '@/types';
@@ -357,30 +358,30 @@ export function PackageBuilderModal({ tour, onClose, onSaved }: PackageBuilderMo
                                     <Input value={basic.category} onChange={(e) => setBasic({ ...basic, category: e.target.value })} />
                                 </Field>
                                 <Field label="Tour type">
-                                    <select
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                                    <AccessibleSelect
                                         value={basic.tourType}
-                                        onChange={(e) => setBasic({ ...basic, tourType: e.target.value })}
-                                    >
-                                        <option value="cultural">cultural</option>
-                                        <option value="adventure">adventure</option>
-                                        <option value="historical">historical</option>
-                                        <option value="trekking">trekking</option>
-                                        <option value="wildlife">wildlife</option>
-                                        <option value="photography">photography</option>
-                                        <option value="mixed">mixed</option>
-                                    </select>
+                                        onChange={(v) => setBasic({ ...basic, tourType: v })}
+                                        options={[
+                                            { value: 'cultural', label: 'cultural' },
+                                            { value: 'adventure', label: 'adventure' },
+                                            { value: 'historical', label: 'historical' },
+                                            { value: 'trekking', label: 'trekking' },
+                                            { value: 'wildlife', label: 'wildlife' },
+                                            { value: 'photography', label: 'photography' },
+                                            { value: 'mixed', label: 'mixed' },
+                                        ]}
+                                    />
                                 </Field>
                                 <Field label="Status">
-                                    <select
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                                    <AccessibleSelect
                                         value={basic.status}
-                                        onChange={(e) => setBasic({ ...basic, status: e.target.value })}
-                                    >
-                                        <option value="draft">draft</option>
-                                        <option value="published">published</option>
-                                        <option value="archived">archived</option>
-                                    </select>
+                                        onChange={(v) => setBasic({ ...basic, status: v })}
+                                        options={[
+                                            { value: 'draft', label: 'draft' },
+                                            { value: 'published', label: 'published' },
+                                            { value: 'archived', label: 'archived' },
+                                        ]}
+                                    />
                                 </Field>
                                 <div className="md:col-span-2 space-y-1">
                                     <label className="text-xs font-bold uppercase text-muted-foreground">Short description</label>
@@ -463,15 +464,15 @@ export function PackageBuilderModal({ tour, onClose, onSaved }: PackageBuilderMo
                                     />
                                 </Field>
                                 <Field label="Pricing type">
-                                    <select
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                                    <AccessibleSelect
                                         value={pricing.pricingType}
-                                        onChange={(e) => setPricing({ ...pricing, pricingType: e.target.value })}
-                                    >
-                                        <option value="per_person">per_person</option>
-                                        <option value="fixed_group">fixed_group</option>
-                                        <option value="hybrid">hybrid</option>
-                                    </select>
+                                        onChange={(v) => setPricing({ ...pricing, pricingType: v })}
+                                        options={[
+                                            { value: 'per_person', label: 'per_person' },
+                                            { value: 'fixed_group', label: 'fixed_group' },
+                                            { value: 'hybrid', label: 'hybrid' },
+                                        ]}
+                                    />
                                 </Field>
                                 <Field label="Deposit %">
                                     <Input
@@ -500,15 +501,15 @@ export function PackageBuilderModal({ tour, onClose, onSaved }: PackageBuilderMo
                                     />
                                 </Field>
                                 <Field label="Departure type">
-                                    <select
-                                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none text-white"
+                                    <AccessibleSelect
                                         value={avail.departureType}
-                                        onChange={(e) => setAvail({ ...avail, departureType: e.target.value })}
-                                    >
-                                        <option value="fixed_schedule">fixed_schedule</option>
-                                        <option value="on_request">on_request</option>
-                                        <option value="rolling">rolling</option>
-                                    </select>
+                                        onChange={(v) => setAvail({ ...avail, departureType: v })}
+                                        options={[
+                                            { value: 'fixed_schedule', label: 'fixed_schedule' },
+                                            { value: 'on_request', label: 'on_request' },
+                                            { value: 'rolling', label: 'rolling' },
+                                        ]}
+                                    />
                                 </Field>
                                 <Field label="Booking cutoff (hours)">
                                     <Input

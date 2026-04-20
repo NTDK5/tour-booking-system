@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 import { useAdminBookings, useDeleteBooking, useUpdateBooking } from '@/hooks/useAdminBookings';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/Skeleton';
@@ -21,6 +22,7 @@ import toast from 'react-hot-toast';
 
 import { OfflineBookingForm } from '@/features/admin/OfflineBookingForm';
 import { AdminBookingDetailModal } from '@/features/admin/bookings/AdminBookingDetailModal';
+
 
 export default function BookingManagementPage() {
     const [searchTerm, setSearchTerm] = useState('');
@@ -119,31 +121,31 @@ export default function BookingManagementPage() {
                     />
                 </div>
                 <div>
-                    <select
-                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                    <AccessibleSelect
                         value={lifecycleFilter}
-                        onChange={(e) => setLifecycleFilter(e.target.value)}
-                    >
-                        <option value="">All lifecycle</option>
-                        <option value="pending">Pending</option>
-                        <option value="confirmed">Confirmed</option>
-                        <option value="in_progress">In progress</option>
-                        <option value="completed">Completed</option>
-                        <option value="cancelled">Cancelled</option>
-                    </select>
+                        onChange={setLifecycleFilter}
+                        options={[
+                            { value: '', label: 'All lifecycle' },
+                            { value: 'pending', label: 'Pending' },
+                            { value: 'confirmed', label: 'Confirmed' },
+                            { value: 'in_progress', label: 'In progress' },
+                            { value: 'completed', label: 'Completed' },
+                            { value: 'cancelled', label: 'Cancelled' },
+                        ]}
+                    />
                 </div>
                 <div>
-                    <select
-                        className="w-full h-11 px-4 rounded-xl bg-surface-dark border border-surface-border outline-none"
+                    <AccessibleSelect
                         value={filterType}
-                        onChange={(e) => setFilterType(e.target.value)}
-                    >
-                        <option value="All">All Types</option>
-                        <option value="tour">Tour</option>
-                        <option value="lodge">Lodge</option>
-                        <option value="car">Car</option>
-                        <option value="custom">Custom Trip</option>
-                    </select>
+                        onChange={setFilterType}
+                        options={[
+                            { value: 'All', label: 'All Types' },
+                            { value: 'tour', label: 'Tour' },
+                            { value: 'lodge', label: 'Lodge' },
+                            { value: 'car', label: 'Car' },
+                            { value: 'custom', label: 'Custom Trip' },
+                        ]}
+                    />
                 </div>
                 <div className="flex items-center justify-center text-xs font-bold text-muted-foreground uppercase opacity-50 md:col-span-2">
                     {filteredBookings?.length || 0} Results

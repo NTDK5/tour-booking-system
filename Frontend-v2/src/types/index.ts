@@ -27,15 +27,24 @@ export interface Tour {
     shortDescription?: string;
     fullDescription?: string;
     destination: string;
-    duration: number; // days
+    destinations?: string[];
+    duration: number; // legacy UI expects numeric days
+    durationDetails?: { days: number; nights?: number }; // enterprise fallback
     groupSize: number;
+    minGuests?: number;
+    maxGuests?: number;
+    bookingCutoffHours?: number;
     price: number;
+    basePrice?: number;
+    pricingType?: 'per_person' | 'fixed_group' | 'hybrid';
+    depositPercent?: number;
     discountPrice?: number;
     images: string[];
     imageUrl?: string[];
     highlights: string[];
     included: string[];
     excluded: string[];
+    addons?: { name: string; price: number; optional?: boolean; description?: string }[];
     itinerary: ItineraryDay[];
     tourType: TourType;
     difficulty: 'easy' | 'moderate' | 'challenging';
@@ -140,6 +149,47 @@ export interface BookingTraveler {
     travelerType?: 'adult' | 'child' | 'infant';
     passportNumber?: string;
     nationality?: string;
+}
+
+export interface TourAddonOption {
+    name: string;
+    price: number;
+    optional?: boolean;
+    description?: string;
+}
+
+export interface BookingDepartureOption {
+    _id: string;
+    sku?: string;
+    startsAt: string;
+    endsAt?: string;
+    status: 'scheduled' | 'open' | 'full' | 'cancelled';
+    capacity: number;
+    reservedGuests: number;
+    confirmedGuests: number;
+    seatsLeft: number;
+}
+
+export interface BookingQuoteResponse {
+    available: boolean;
+    reasons: string[];
+    quote: {
+        currency: string;
+        lines: { label: string; amount: number }[];
+        subtotal: number;
+        discounts: number;
+        deposit: number;
+        total: number;
+        pricingType: string;
+    };
+    pricingSnapshot: PricingSnapshot;
+    addOnLines: {
+        addonKey: string;
+        name: string;
+        unitPrice: number;
+        quantity: number;
+        lineTotal: number;
+    }[];
 }
 
 export interface Booking {

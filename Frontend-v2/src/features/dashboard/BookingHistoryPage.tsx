@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Button } from '@/components/ui/Button';
-import { useCancelBooking, useDeleteUserBooking, useRespondOffer } from '@/hooks/useBookings';
+import { useCancelBooking, useDeleteUserBooking, useRespondOffer, usePayBookingBalance } from '@/hooks/useBookings';
 import { Calendar, Package, ChevronRight, Clock } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -19,6 +19,7 @@ export default function BookingHistoryPage() {
     const respondOffer = useRespondOffer();
     const cancelBooking = useCancelBooking();
     const deleteBooking = useDeleteUserBooking();
+    const payBalance = usePayBookingBalance();
     const [selectedBooking, setSelectedBooking] = useState<any | null>(null);
 
     const handleAccept = (id: string) => {
@@ -46,6 +47,18 @@ export default function BookingHistoryPage() {
                 bookingId: id,
                 decision: 'rejected',
             }, { onSuccess: () => refetch() });
+        }
+    };
+
+    const handlePayBalance = async (booking: any) => {
+        const amount = Number(booking?.paymentSummary?.balanceDue || 0);
+        if (!amount || amount <= 0) {
+            toast.error('No balance due on this booking.');
+            return;
+        }
+        const res = await payBalance.mutateAsync({ bookingId: booking._id, amount });
+        if (res?.clientSecret) {
+            toast.success('Payment session created. Stripe form hookup is ready to be integrated.');
         }
     };
 
@@ -195,6 +208,16 @@ export default function BookingHistoryPage() {
                                             {booking.totalPrice > 0 ? `$${booking.totalPrice}` : 'Price TBD'}
                                         </div>
                                         <div className="flex gap-2 mt-2 justify-end">
+                                            {Number(booking?.paymentSummary?.balanceDue || 0) > 0 && booking.status !== 'cancelled' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="accent"
+                                                    onClick={() => handlePayBalance(booking)}
+                                                    isLoading={payBalance.isPending}
+                                                >
+                                                    Pay Balance
+                                                </Button>
+                                            )}
                                             {booking.status !== 'cancelled' && (
                                                 <Button size="sm" variant="outline" onClick={() => handleCancel(booking._id)} isLoading={cancelBooking.isPending}>
                                                     Cancel
@@ -283,6 +306,17 @@ export default function BookingHistoryPage() {
                                 {selectedBooking.documents?.invoiceUrl && (
                                     <p className="text-primary truncate">{selectedBooking.documents.invoiceUrl}</p>
                                 )}
+                            </div>
+                        )}
+                        {Number(selectedBooking.paymentSummary?.balanceDue || 0) > 0 && (
+                            <div className="flex justify-end">
+                                <Button
+                                    variant="accent"
+                                    onClick={() => handlePayBalance(selectedBooking)}
+                                    isLoading={payBalance.isPending}
+                                >
+                                    Pay Remaining Balance (${Number(selectedBooking.paymentSummary.balanceDue).toFixed(2)})
+                                </Button>
                             </div>
                         )}
                         {selectedBooking.customCarRequest && (

@@ -25,6 +25,12 @@ export function PackageHero({ tour, mainImageUrl, onBack }: PackageHeroProps) {
         trekking: 'bg-green-500/20 text-green-400',
     };
 
+    const destinationLabel = tour.destinations?.length
+        ? tour.destinations.join(', ')
+        : tour.destination;
+    const durationDays = Number(tour.durationDetails?.days ?? tour.duration ?? 0);
+    const maxGuests = tour.maxGuests || tour.groupSize;
+
     return (
         <section className="relative h-[60vh] md:h-[75vh] group overflow-hidden">
             <div className="absolute inset-0">
@@ -64,15 +70,15 @@ export function PackageHero({ tour, mainImageUrl, onBack }: PackageHeroProps) {
                 <div className="flex flex-wrap items-center gap-6 text-neutral-300">
                     <div className="flex items-center gap-2">
                         <MapPin className="w-5 h-5 text-primary" />
-                        <span>{tour.destination}</span>
+                        <span>{destinationLabel}</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Clock className="w-5 h-5 text-primary" />
-                        <span>{tour.duration} Days</span>
+                        <span>{durationDays} Days</span>
                     </div>
                     <div className="flex items-center gap-2">
                         <Users className="w-5 h-5 text-primary" />
-                        <span>Max {tour.groupSize} People</span>
+                        <span>Max {maxGuests} People</span>
                     </div>
                 </div>
             </div>

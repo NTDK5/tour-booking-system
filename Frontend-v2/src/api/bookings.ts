@@ -1,5 +1,11 @@
 import { apiClient } from '@/api/client';
-import type { Booking, BookingTimelineEvent } from '@/types';
+import type {
+    Booking,
+    BookingTimelineEvent,
+    BookingQuoteResponse,
+    BookingDepartureOption,
+    TourAddonOption,
+} from '@/types';
 
 export const bookingsApi = {
     create: async (payload: Omit<Booking, '_id' | 'createdAt' | 'updatedAt'>): Promise<Booking> => {
@@ -61,6 +67,30 @@ export const bookingsApi = {
         amount: number
     ): Promise<{ clientSecret: string | null }> => {
         const { data } = await apiClient.post(`/bookings/${bookingId}/payments/balance`, { amount });
+        return data;
+    },
+
+    quote: async (payload: {
+        bookingType: 'tour' | 'lodge' | 'car';
+        tourId?: string;
+        numberOfPeople?: number;
+        children?: number;
+        bookingDate?: string;
+        selectedAddons?: string[];
+        departureId?: string;
+    }): Promise<BookingQuoteResponse> => {
+        const { data } = await apiClient.post('/bookings/quote', payload);
+        return data;
+    },
+
+    getTourOptions: async (
+        tourId: string
+    ): Promise<{
+        addons: TourAddonOption[];
+        departures: BookingDepartureOption[];
+        bookingCutoffHours: number;
+    }> => {
+        const { data } = await apiClient.get(`/bookings/options/tour/${tourId}`);
         return data;
     },
 };

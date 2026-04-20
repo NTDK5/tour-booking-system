@@ -13,6 +13,8 @@ import {
     confirmRequestBooking,
     getBookingTimeline,
     payBookingBalance,
+    quoteBooking,
+    getTourBookingOptions,
 } from '../controllers/bookingController';
 
 import { bookingSchema, updateBookingSchema, payBalanceSchema } from '../schemas/bookingSchemas';
@@ -26,6 +28,8 @@ router.route('/')
 
 router.get('/user', protect, getUserBookings);
 router.get('/check-availability', protect, checkAvailability);
+router.post('/quote', protect, quoteBooking);
+router.get('/options/tour/:tourId', protect, getTourBookingOptions);
 router.get('/:id/timeline', protect, getBookingTimeline);
 router.post('/:id/payments/balance', protect, validate(payBalanceSchema), payBookingBalance);
 router.put('/:id/respond-offer', protect, respondToOffer);

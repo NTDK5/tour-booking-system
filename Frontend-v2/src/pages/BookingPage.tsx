@@ -1,97 +1,177 @@
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/providers/AuthProvider';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
 import { motion, AnimatePresence } from 'framer-motion';
-import {
-    ArrowLeft, ArrowRight, CreditCard,
-    Calendar, Users, Info, ShieldCheck,
-    MapPin, Home, Car as CarIcon, Map
-} from 'lucide-react';
+import { ArrowRight, Calendar, CreditCard, Info, Users, AlertTriangle, Sparkles } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/providers/AuthProvider';
 import { useTour } from '@/hooks/useTours';
 import { useLodge } from '@/hooks/useLodges';
-import { useCreateBooking } from '@/hooks/useBookings';
+import { useCreateBooking, useBookingQuote, useTourBookingOptions } from '@/hooks/useBookings';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ProgressStepper } from '@/components/ui/ProgressStepper';
 import { BookingSummaryCard } from '@/components/ui/BookingSummaryCard';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
-import { format } from 'date-fns';
-
-const travelerSchema = z.object({
-    firstName: z.string().min(2, 'First name is required'),
-    lastName: z.string().min(2, 'Last name is required'),
-    email: z.string().email('Valid email is required'),
-    phone: z.string().min(5, 'Phone number is required'),
-    nationality: z.string().min(2, 'Nationality is required'),
-    specialRequests: z.string().optional(),
-});
-
-type TravelerData = z.infer<typeof travelerSchema>;
 
 const STEPS = ['Selection', 'Travelers', 'Review', 'Payment'];
+
+type TravelerRow = {
+    fullName: string;
+    travelerType: 'adult' | 'child' | 'infant';
+    nationality?: string;
+    passportNumber?: string;
+};
+
+const toDateInputValue = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+};
 
 export default function BookingPage() {
     const { user } = useAuth();
     const { tourId } = useParams<{ tourId: string }>();
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
-
     const bookingType = searchParams.get('type') || 'tour';
     const checkInParam = searchParams.get('checkIn');
     const checkOutParam = searchParams.get('checkOut');
     const roomTypeParam = searchParams.get('room');
 
     const [step, setStep] = useState(1);
+    const [children, setChildren] = useState(0);
+    const [notes, setNotes] = useState('');
+    const [selectedDepartureId, setSelectedDepartureId] = useState('');
+    const [selectedAddons, setSelectedAddons] = useState<string[]>([]);
     const [bookingData, setBookingData] = useState({
         startDate: checkInParam || '',
         endDate: checkOutParam || '',
         guests: 1,
         roomType: roomTypeParam || '',
     });
+    const [travelers, setTravelers] = useState<TravelerRow[]>([
+        { fullName: '', travelerType: 'adult', nationality: '', passportNumber: '' },
+    ]);
 
-    // Fetch based on type
-    const { data: tour, isLoading: isTourLoading } = useTour(bookingType === 'tour' ? tourId! : '');
-    const { data: lodge, isLoading: isLodgeLoading } = useLodge(bookingType === 'lodge' ? tourId! : '');
+    const { data: tour, isLoading: isTourLoading } = useTour(bookingType === 'tour' ? tourId || '' : '');
+    const { data: lodge, isLoading: isLodgeLoading } = useLodge(bookingType === 'lodge' ? tourId || '' : '');
+    const {
+        data: tourOptions,
+        isLoading: isOptionsLoading,
+    } = useTourBookingOptions(tourId || '', bookingType === 'tour');
 
     const createBookingMutation = useCreateBooking();
-    const [travelerInfo, setTravelerInfo] = useState<TravelerData | null>(null);
+    const quoteMutation = useBookingQuote();
 
-    const { register, handleSubmit, formState: { errors } } = useForm<TravelerData>({
-        resolver: zodResolver(travelerSchema),
-    });
-
-    const isLoading = isTourLoading || isLodgeLoading;
+    const isLoading = isTourLoading || isLodgeLoading || (bookingType === 'tour' && isOptionsLoading);
     const entity = bookingType === 'tour' ? tour : lodge;
 
-    if (isLoading) return <div className="p-20"><Skeleton className="h-96" /></div>;
-    if (!entity && !isLoading) return <ErrorState />;
+    const quote = quoteMutation.data?.quote;
+    const canContinueSelection = bookingData.startDate && (bookingType !== 'lodge' || bookingData.endDate);
+    const cutoffHours = Number(tourOptions?.bookingCutoffHours ?? 24);
 
-    const nextStep = () => setStep(s => Math.min(s + 1, 4));
-    const prevStep = () => setStep(s => Math.max(s - 1, 1));
+    const earliestBookableDate = useMemo(() => {
+        const date = new Date();
+        date.setHours(date.getHours() + cutoffHours);
+        return toDateInputValue(date);
+    }, [cutoffHours]);
 
-    const onTravelerSubmit = (data: TravelerData) => {
-        setTravelerInfo(data);
-        nextStep();
+    const totalPrice = useMemo(() => {
+        if (bookingType === 'tour') return quote?.total ?? 0;
+        if (bookingType === 'lodge' && lodge) {
+            const room = lodge.roomTypes.find((r: any) => r.type === bookingData.roomType) || lodge.roomTypes[0];
+            return room?.price ?? 0;
+        }
+        return 0;
+    }, [bookingType, quote?.total, lodge, bookingData.roomType]);
+
+    const syncTravelerRows = (guestCount: number) => {
+        setTravelers((prev) => {
+            const next = [...prev];
+            while (next.length < guestCount) {
+                next.push({ fullName: '', travelerType: 'adult', nationality: '', passportNumber: '' });
+            }
+            return next.slice(0, guestCount);
+        });
     };
 
+    const recalcQuote = async () => {
+        if (bookingType !== 'tour' || !tourId || !bookingData.startDate) return;
+        try {
+            const result = await quoteMutation.mutateAsync({
+                bookingType: 'tour',
+                tourId,
+                numberOfPeople: bookingData.guests,
+                children,
+                bookingDate: bookingData.startDate,
+                selectedAddons,
+                departureId: selectedDepartureId || undefined,
+            });
+            return result;
+        } catch {
+            // handled by UI
+            return null;
+        }
+    };
+
+    const nextStep = async () => {
+        if (step === 1 && bookingType === 'tour') {
+            if (bookingData.startDate < earliestBookableDate) {
+                toast.error(`Please select ${earliestBookableDate} or later due to booking cutoff.`);
+                return;
+            }
+            const result = await recalcQuote();
+            if (result && !result.available) {
+                toast.error(result.reasons?.join('; ') || 'Tour not available for selected options');
+                return;
+            }
+        }
+        setStep((s) => Math.min(s + 1, 4));
+    };
+    const prevStep = () => setStep((s) => Math.max(s - 1, 1));
+
+    const isTravelerStepValid =
+        travelers.length === bookingData.guests &&
+        travelers.every((t) => t.fullName.trim().length > 1);
+
     const handleFinalConfirm = async () => {
-        if (!travelerInfo || !user) return;
+        if (!user) return;
+        if (!isTravelerStepValid) {
+            toast.error('Please complete traveler names');
+            setStep(2);
+            return;
+        }
+
+        if (bookingType === 'tour' && !quoteMutation.data) {
+            const result = await recalcQuote();
+            if (result && !result.available) {
+                toast.error(result.reasons?.join('; ') || 'Tour not available for selected options');
+                return;
+            }
+        }
 
         const payload: any = {
             bookingType,
             numberOfPeople: bookingData.guests,
             paymentMethod: 'paypal',
-            notes: travelerInfo.specialRequests,
-            totalPrice: getPrice(),
+            notes,
+            totalPrice,
         };
 
         if (bookingType === 'tour') {
             payload.tourId = tourId;
             payload.bookingDate = bookingData.startDate;
+            payload.children = children;
+            payload.selectedAddons = selectedAddons;
+            payload.departureId = selectedDepartureId || undefined;
+            payload.travelers = travelers.map((t) => ({
+                fullName: t.fullName.trim(),
+                travelerType: t.travelerType,
+                nationality: t.nationality || undefined,
+                passportNumber: t.passportNumber || undefined,
+            }));
         } else if (bookingType === 'lodge') {
             payload.lodgeId = tourId;
             payload.checkInDate = bookingData.startDate;
@@ -100,27 +180,29 @@ export default function BookingPage() {
         }
 
         try {
-            await createBookingMutation.mutateAsync(payload);
-            navigate('/dashboard/bookings');
-        } catch (error) {
-            // Handled by mutation hook
+            const booking = await createBookingMutation.mutateAsync(payload);
+            toast.success('Booking created. You can complete payment from booking history.');
+            navigate(`/dashboard/bookings`);
+            return booking;
+        } catch {
+            // handled by hook
+            return null;
         }
     };
 
-    const getPrice = () => {
-        if (bookingType === 'tour' && tour) return tour.price * bookingData.guests;
-        if (bookingType === 'lodge' && lodge) {
-            const room = lodge.roomTypes.find((r: any) => r.type === bookingData.roomType) || lodge.roomTypes[0];
-            return room.price;
-        }
-        return 0;
-    };
+    if (isLoading) return <div className="p-20"><Skeleton className="h-96" /></div>;
+    if (!entity && !isLoading) return <ErrorState />;
 
     return (
         <div className="min-h-screen bg-surface py-12 md:py-20">
             <div className="section-container">
-                <header className="mb-12 text-center">
-                    <h1 className="text-3xl font-bold text-white mb-4 italic">Complete Your <span className="text-primary tracking-widest">{bookingType === 'tour' ? 'Adventure' : 'Stay'}</span></h1>
+                <header className="mb-10 md:mb-12 text-center">
+                    <h1 className="text-4xl md:text-5xl font-extrabold text-white mb-3">
+                        Complete Your <span className="text-primary">{bookingType === 'tour' ? 'Adventure' : 'Stay'}</span>
+                    </h1>
+                    <p className="text-neutral-400 text-base md:text-lg max-w-2xl mx-auto mb-6">
+                        Enterprise booking flow: live pricing snapshot, traveler manifest, departure capacity checks, and ledger-ready payment state.
+                    </p>
                     <ProgressStepper steps={STEPS} currentStep={step} />
                 </header>
 
@@ -129,17 +211,19 @@ export default function BookingPage() {
                         <AnimatePresence mode="wait">
                             {step === 1 && (
                                 <motion.div key="step1" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
-                                    <div className="card bg-surface-light p-8 border-surface-border">
-                                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2">
+                                    <div className="card bg-surface-light p-6 md:p-8 border-surface-border rounded-3xl space-y-6">
+                                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-2 flex items-center gap-2">
                                             <Calendar className="w-5 h-5 text-primary" />
-                                            {bookingType === 'tour' ? 'Date & Guests' : 'Lodge Preferences'}
+                                            {bookingType === 'tour' ? 'Date, Travelers, Add-ons' : 'Lodge Preferences'}
                                         </h3>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                                             <Input
-                                                label={bookingType === 'tour' ? "Start Date" : "Check-in Date"}
+                                                label={bookingType === 'tour' ? 'Travel Date' : 'Check-in Date'}
                                                 type="date"
+                                                min={bookingType === 'tour' ? earliestBookableDate : undefined}
                                                 value={bookingData.startDate}
                                                 onChange={(e) => setBookingData({ ...bookingData, startDate: e.target.value })}
+                                                className="h-14 text-base md:text-lg"
                                             />
                                             {bookingType === 'lodge' && (
                                                 <Input
@@ -147,20 +231,38 @@ export default function BookingPage() {
                                                     type="date"
                                                     value={bookingData.endDate}
                                                     onChange={(e) => setBookingData({ ...bookingData, endDate: e.target.value })}
+                                                    className="h-14 text-base md:text-lg"
                                                 />
                                             )}
                                             <Input
-                                                label="Number of Guests"
+                                                label="Total Guests"
                                                 type="number"
                                                 min={1}
                                                 value={bookingData.guests}
-                                                onChange={(e) => setBookingData({ ...bookingData, guests: Number(e.target.value) })}
+                                                onChange={(e) => {
+                                                    const guests = Math.max(1, Number(e.target.value) || 1);
+                                                    setBookingData({ ...bookingData, guests });
+                                                    setChildren((c) => Math.min(c, guests));
+                                                    syncTravelerRows(guests);
+                                                }}
+                                                className="h-14 text-base md:text-lg"
                                             />
+                                            {bookingType === 'tour' && (
+                                                <Input
+                                                    label="Children"
+                                                    type="number"
+                                                    min={0}
+                                                    max={bookingData.guests}
+                                                    value={children}
+                                                    onChange={(e) => setChildren(Math.max(0, Math.min(bookingData.guests, Number(e.target.value) || 0)))}
+                                                    className="h-14 text-base md:text-lg"
+                                                />
+                                            )}
                                             {bookingType === 'lodge' && lodge && (
                                                 <div className="space-y-2">
                                                     <label className="text-xs font-bold text-neutral-500 uppercase px-2">Room Type</label>
                                                     <select
-                                                        className="w-full h-14 bg-surface border border-surface-border rounded-2xl px-4 text-white outline-none focus:border-primary transition-all"
+                                                        className="w-full h-14 bg-surface border border-surface-border rounded-xl px-4 text-base md:text-lg text-white outline-none focus:border-primary transition-all"
                                                         value={bookingData.roomType}
                                                         onChange={(e) => setBookingData({ ...bookingData, roomType: e.target.value })}
                                                     >
@@ -171,73 +273,227 @@ export default function BookingPage() {
                                                     </select>
                                                 </div>
                                             )}
+                                            {bookingType === 'tour' && (
+                                                <div className="space-y-2 md:col-span-2">
+                                                    <label className="text-xs font-bold text-neutral-500 uppercase px-2">Departure (optional)</label>
+                                                    <select
+                                                        className="w-full h-14 bg-surface border border-surface-border rounded-xl px-4 text-base md:text-lg text-white outline-none focus:border-primary transition-all"
+                                                        value={selectedDepartureId}
+                                                        onChange={(e) => setSelectedDepartureId(e.target.value)}
+                                                    >
+                                                        <option value="">Flexible / no fixed departure</option>
+                                                        {(tourOptions?.departures || []).map((dep) => (
+                                                            <option key={dep._id} value={dep._id} disabled={dep.seatsLeft <= 0}>
+                                                                {new Date(dep.startsAt).toLocaleDateString()} · {dep.seatsLeft} seats left {dep.sku ? `· ${dep.sku}` : ''}
+                                                            </option>
+                                                        ))}
+                                                    </select>
+                                                </div>
+                                            )}
                                         </div>
+
+                                        {bookingType === 'tour' && (
+                                            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-200 flex items-start gap-2">
+                                                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                                                <span>
+                                                    Earliest valid booking date for this package is <strong>{earliestBookableDate}</strong>
+                                                    {' '}based on the {cutoffHours}h booking cutoff.
+                                                </span>
+                                            </div>
+                                        )}
+
+                                        {bookingType === 'tour' && (tourOptions?.addons?.length || 0) > 0 && (
+                                            <div className="space-y-2">
+                                                <p className="text-sm font-bold text-neutral-300 uppercase">Optional Add-ons</p>
+                                                <div className="grid md:grid-cols-2 gap-3">
+                                                    {tourOptions?.addons.map((addon) => {
+                                                        const checked = selectedAddons.includes(addon.name);
+                                                        return (
+                                                            <label key={addon.name} className="flex items-center justify-between gap-3 bg-surface border border-surface-border rounded-xl px-4 py-3 text-base">
+                                                                <span className="font-medium">{addon.name}</span>
+                                                                <span className="text-neutral-300 font-semibold">${addon.price}</span>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={checked}
+                                                                    className="w-5 h-5"
+                                                                    onChange={(e) => {
+                                                                        const next = e.target.checked
+                                                                            ? [...selectedAddons, addon.name]
+                                                                            : selectedAddons.filter((x) => x !== addon.name);
+                                                                        setSelectedAddons(next);
+                                                                    }}
+                                                                />
+                                                            </label>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {bookingType === 'tour' && (
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                <Button variant="outline" onClick={recalcQuote} isLoading={quoteMutation.isPending} className="h-12 text-base">
+                                                    Recalculate Quote
+                                                </Button>
+                                                {quote && (
+                                                    <p className="text-sm text-neutral-300">
+                                                        Deposit: <strong>${quote.deposit.toFixed(2)}</strong> · Total: <strong>${quote.total.toFixed(2)}</strong>
+                                                    </p>
+                                                )}
+                                            </div>
+                                        )}
                                     </div>
-                                    <Button onClick={nextStep} className="w-full md:w-auto px-12 h-14" disabled={!bookingData.startDate || (bookingType === 'lodge' && !bookingData.endDate)}>
-                                        Continue to Details
+                                    <Button onClick={nextStep} className="w-full md:w-auto px-12 h-14 text-base md:text-lg" disabled={!canContinueSelection}>
+                                        Continue to Travelers
                                         <ArrowRight className="ml-2 w-5 h-5" />
                                     </Button>
                                 </motion.div>
                             )}
 
                             {step === 2 && (
-                                <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}>
-                                    <form onSubmit={handleSubmit(onTravelerSubmit)} className="space-y-8">
-                                        <div className="card bg-surface-light p-8 border-surface-border space-y-6">
-                                            <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Users className="w-5 h-5 text-primary" />Traveler Information</h3>
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <Input label="First Name" {...register('firstName')} error={errors.firstName?.message} />
-                                                <Input label="Last Name" {...register('lastName')} error={errors.lastName?.message} />
+                                <motion.div key="step2" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-6">
+                                    <div className="card bg-surface-light p-6 md:p-8 border-surface-border rounded-3xl space-y-4">
+                                        <h3 className="text-2xl md:text-3xl font-bold text-white flex items-center gap-2">
+                                            <Users className="w-5 h-5 text-primary" />
+                                            Traveler Manifest
+                                        </h3>
+                                        <p className="text-sm md:text-base text-neutral-300">
+                                            Fill each traveler clearly for visas, rooming, and operations assignment.
+                                        </p>
+                                        {travelers.map((traveler, idx) => (
+                                            <div key={idx} className="p-4 md:p-5 bg-surface rounded-2xl border border-surface-border space-y-4">
+                                                <div className="text-xs md:text-sm font-semibold uppercase tracking-wide text-primary">
+                                                    Traveler {idx + 1}
+                                                </div>
+                                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                                <Input
+                                                    label="Full name"
+                                                    value={traveler.fullName}
+                                                    onChange={(e) => {
+                                                        const next = [...travelers];
+                                                        next[idx] = { ...next[idx], fullName: e.target.value };
+                                                        setTravelers(next);
+                                                    }}
+                                                    className="h-14 md:h-16 text-base md:text-lg"
+                                                />
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium text-neutral-400 px-1">Type</label>
+                                                    <select
+                                                        className="w-full h-14 md:h-16 bg-surface-light border border-surface-border rounded-xl px-3 text-base md:text-lg text-white [&>option]:text-black [&>option]:bg-white"
+                                                        value={traveler.travelerType}
+                                                        onChange={(e) => {
+                                                            const next = [...travelers];
+                                                            next[idx] = {
+                                                                ...next[idx],
+                                                                travelerType: e.target.value as TravelerRow['travelerType'],
+                                                            };
+                                                            setTravelers(next);
+                                                        }}
+                                                    >
+                                                        <option value="adult">Adult</option>
+                                                        <option value="child">Child</option>
+                                                        <option value="infant">Infant</option>
+                                                    </select>
+                                                </div>
+                                                <Input
+                                                    label="Nationality"
+                                                    value={traveler.nationality || ''}
+                                                    onChange={(e) => {
+                                                        const next = [...travelers];
+                                                        next[idx] = { ...next[idx], nationality: e.target.value };
+                                                        setTravelers(next);
+                                                    }}
+                                                    className="h-14 md:h-16 text-base md:text-lg"
+                                                />
+                                                <Input
+                                                    label="Passport (optional)"
+                                                    value={traveler.passportNumber || ''}
+                                                    onChange={(e) => {
+                                                        const next = [...travelers];
+                                                        next[idx] = { ...next[idx], passportNumber: e.target.value };
+                                                        setTravelers(next);
+                                                    }}
+                                                    className="h-14 md:h-16 text-base md:text-lg"
+                                                />
+                                                </div>
                                             </div>
-                                            <Input label="Email Address" type="email" {...register('email')} error={errors.email?.message} />
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                                <Input label="Phone Number" {...register('phone')} error={errors.phone?.message} />
-                                                <Input label="Nationality" {...register('nationality')} error={errors.nationality?.message} />
-                                            </div>
-                                            <div className="space-y-2">
-                                                <label className="text-xs font-bold text-neutral-500 uppercase">Special Requests</label>
-                                                <textarea {...register('specialRequests')} className="w-full bg-surface border border-surface-border rounded-2xl p-4 text-white outline-none focus:border-primary min-h-[100px]" />
-                                            </div>
+                                        ))}
+                                        <div className="space-y-2">
+                                            <label className="text-sm font-medium text-neutral-400 px-1">Special Requests</label>
+                                            <textarea
+                                                value={notes}
+                                                onChange={(e) => setNotes(e.target.value)}
+                                                className="w-full bg-surface border border-surface-border rounded-xl p-4 text-base md:text-lg text-white outline-none focus:border-primary min-h-[120px]"
+                                            />
                                         </div>
-                                        <div className="flex gap-4">
-                                            <Button variant="secondary" onClick={prevStep} className="h-14 px-8">Back</Button>
-                                            <Button type="submit" className="h-14 px-12 flex-grow md:flex-none">Review</Button>
-                                        </div>
-                                    </form>
+                                    </div>
+                                    <div className="flex gap-4">
+                                        <Button variant="secondary" onClick={prevStep} className="h-14 px-8 text-base">Back</Button>
+                                        <Button onClick={nextStep} className="h-14 px-12 text-base md:text-lg" disabled={!isTravelerStepValid}>
+                                            Review
+                                        </Button>
+                                    </div>
                                 </motion.div>
                             )}
 
                             {step === 3 && (
                                 <motion.div key="step3" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
-                                    <div className="card bg-surface-light p-8 border-surface-border">
-                                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><Info className="w-5 h-5 text-primary" />Final Review</h3>
-                                        <div className="grid grid-cols-2 gap-8 text-sm">
-                                            <div><span className="text-neutral-500 block">Traveler</span><span className="text-white font-bold">{travelerInfo?.firstName} {travelerInfo?.lastName}</span></div>
-                                            <div><span className="text-neutral-500 block">Reservaton</span><span className="text-white font-bold">{(entity as any)?.title || (entity as any)?.name}</span></div>
-                                            <div><span className="text-neutral-500 block">Type</span><span className="text-primary font-black uppercase tracking-widest">{bookingType}</span></div>
-                                            <div><span className="text-neutral-500 block">Dates</span><span className="text-white font-bold">{bookingData.startDate} {bookingData.endDate ? `to ${bookingData.endDate}` : ''}</span></div>
-                                        </div>
+                                    <div className="card bg-surface-light p-6 md:p-8 border-surface-border rounded-3xl space-y-3">
+                                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-3 flex items-center gap-2">
+                                            <Info className="w-5 h-5 text-primary" />
+                                            Final Review
+                                        </h3>
+                                        <p className="text-base text-neutral-300">{travelers.length} travelers · {children} children</p>
+                                        {selectedAddons.length > 0 && (
+                                            <p className="text-sm text-neutral-400">Add-ons: {selectedAddons.join(', ')}</p>
+                                        )}
+                                        {selectedDepartureId && (
+                                            <p className="text-sm text-neutral-400">Departure selected</p>
+                                        )}
+                                        {quote?.lines?.length ? (
+                                            <ul className="text-base border border-surface-border rounded-xl p-4 space-y-2">
+                                                {quote.lines.map((line, idx) => (
+                                                    <li key={idx} className="flex justify-between">
+                                                        <span>{line.label}</span>
+                                                        <span>${Number(line.amount).toFixed(2)}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        ) : null}
                                     </div>
                                     <div className="flex gap-4">
-                                        <Button variant="secondary" onClick={prevStep} className="h-14 px-8">Back</Button>
-                                        <Button onClick={nextStep} className="h-14 px-12 flex-grow md:flex-none">Proceed to Payment</Button>
+                                        <Button variant="secondary" onClick={prevStep} className="h-14 px-8 text-base">Back</Button>
+                                        <Button onClick={nextStep} className="h-14 px-12 text-base md:text-lg">Proceed to Payment</Button>
                                     </div>
                                 </motion.div>
                             )}
 
                             {step === 4 && (
                                 <motion.div key="step4" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
-                                    <div className="card bg-surface-light p-8 border-primary/20 bg-primary/5">
-                                        <h3 className="text-xl font-bold text-white mb-6 flex items-center gap-2"><CreditCard className="w-5 h-5 text-primary" />Payment Method</h3>
-                                        <div className="p-10 border-2 border-dashed border-surface-border rounded-3xl flex flex-col items-center text-center">
-                                            <ShieldCheck className="w-12 h-12 text-primary mb-4" />
-                                            <h4 className="text-white font-bold mb-2">PayPal Checkout</h4>
-                                            <p className="text-xs text-neutral-500">Secure, encrypted, and fast.</p>
+                                    <div className="card bg-surface-light p-6 md:p-8 border-primary/20 bg-primary/5 rounded-3xl">
+                                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-4 flex items-center gap-2">
+                                            <CreditCard className="w-5 h-5 text-primary" />
+                                            Payment Overview
+                                        </h3>
+                                        <p className="text-base text-neutral-300">
+                                            Booking creation stores an initial payment ledger row. You can complete payment from booking history.
+                                        </p>
+                                        {quote && (
+                                            <div className="mt-4 grid md:grid-cols-2 gap-3 text-base">
+                                                <p>Total: <span className="font-bold">${quote.total.toFixed(2)}</span></p>
+                                                <p>Deposit due: <span className="font-bold">${quote.deposit.toFixed(2)}</span></p>
+                                            </div>
+                                        )}
+                                        <div className="mt-4 text-sm text-neutral-400 inline-flex items-center gap-2">
+                                            <Sparkles size={14} className="text-primary" />
+                                            You can pay balance later from Booking History when needed.
                                         </div>
                                     </div>
                                     <div className="flex gap-4">
-                                        <Button variant="secondary" onClick={prevStep} className="h-14 px-8">Back</Button>
-                                        <Button onClick={handleFinalConfirm} isLoading={createBookingMutation.isPending} className="h-14 px-12 flex-grow md:flex-none">Complete Booking</Button>
+                                        <Button variant="secondary" onClick={prevStep} className="h-14 px-8 text-base">Back</Button>
+                                        <Button onClick={handleFinalConfirm} isLoading={createBookingMutation.isPending} className="h-14 px-12 text-base md:text-lg">
+                                            Complete Booking
+                                        </Button>
                                     </div>
                                 </motion.div>
                             )}
@@ -249,7 +505,7 @@ export default function BookingPage() {
                             tourTitle={(entity as any)?.title || (entity as any)?.name || 'Reservation'}
                             startDate={bookingData.startDate || 'Not selected'}
                             guests={bookingData.guests}
-                            totalPrice={getPrice()}
+                            totalPrice={totalPrice}
                         />
                     </aside>
                 </div>
