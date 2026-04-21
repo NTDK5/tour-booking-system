@@ -60,6 +60,13 @@ export const bookingsApi = {
         const { data } = await apiClient.get(`/admin/bookings/${id}`);
         return data;
     },
+    adminUpdateStatus: async (
+        id: string,
+        payload: { lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; reason?: string; refundAmount?: number }
+    ): Promise<Booking> => {
+        const { data } = await apiClient.patch(`/admin/bookings/${id}/status`, payload);
+        return data;
+    },
 
     /** Customer — Stripe PaymentIntent for remaining balance */
     payBalance: async (

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
     Globe,
@@ -13,6 +13,7 @@ import {
     Activity,
     AlertCircle,
 } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { useDeleteTour, tourKeys } from '@/hooks/useTours';
@@ -20,6 +21,8 @@ import { adminPackagesApi } from '@/api/packages';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { PackageBuilderModal } from '@/features/admin/packages/PackageBuilderModal';
 import type { Tour } from '@/types';
+import { bookingsApi } from '@/api/bookings';
+import { DepartureAssignmentPanel } from '@/features/admin/assignments/DepartureAssignmentPanel';
 
 function mapAdminRowToTour(t: Record<string, any>): Tour {
     const dest = Array.isArray(t.destinations) && t.destinations.length ? t.destinations[0] : t.destination || '';
@@ -60,9 +63,16 @@ function mapAdminRowToTour(t: Record<string, any>): Tour {
 
 export default function TourManagementPage() {
     const queryClient = useQueryClient();
+    const location = useLocation();
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
     const [detailTour, setDetailTour] = useState<Tour | null>(null);
+    const [postLoginAction, setPostLoginAction] = useState<any>((location.state as any)?.postLoginAction || null);
+
+    useEffect(() => {
+        const action = (location.state as any)?.postLoginAction;
+        if (action) setPostLoginAction(action);
+    }, [location.state]);
 
     const { data: toursData, isLoading, error } = useQuery({
         queryKey: ['admin-packages'],
@@ -125,6 +135,8 @@ export default function TourManagementPage() {
                 <TourDetailsModal
                     tour={detailTour}
                     onClose={() => setDetailTour(null)}
+                    postLoginAction={postLoginAction}
+                    onPostLoginActionConsumed={() => setPostLoginAction(null)}
                 />
             )}
 
@@ -225,8 +237,39 @@ export default function TourManagementPage() {
     );
 }
 
-function TourDetailsModal({ tour, onClose }: { tour: Tour; onClose: () => void }) {
+function TourDetailsModal({
+    tour,
+    onClose,
+    postLoginAction,
+    onPostLoginActionConsumed,
+}: {
+    tour: Tour;
+    onClose: () => void;
+    postLoginAction?: any;
+    onPostLoginActionConsumed?: () => void;
+}) {
     const itineraryPreview = (tour.itinerary || []).slice(0, 8);
+    const [selectedDepartureId, setSelectedDepartureId] = useState<string>('');
+    const { data: options } = useQuery({
+        queryKey: ['admin', 'tour-departure-options', tour._id],
+        queryFn: () => bookingsApi.getTourOptions(tour._id),
+        enabled: Boolean(tour._id),
+    });
+    useEffect(() => {
+        if (!selectedDepartureId && options?.departures?.length) {
+            setSelectedDepartureId(options.departures[0]._id);
+        }
+    }, [options, selectedDepartureId]);
+    useEffect(() => {
+        if (
+            postLoginAction?.action === 'assign_staff' &&
+            postLoginAction?.departureId &&
+            options?.departures?.some((d) => d._id === postLoginAction.departureId)
+        ) {
+            setSelectedDepartureId(postLoginAction.departureId);
+            onPostLoginActionConsumed?.();
+        }
+    }, [postLoginAction, options, onPostLoginActionConsumed]);
     return (
         <div className="fixed inset-0 z-[150] bg-black/65 backdrop-blur-sm flex items-center justify-center p-4">
             <div className="w-full max-w-5xl max-h-[90vh] overflow-hidden rounded-2xl border border-surface-border bg-surface-light shadow-2xl">
@@ -299,6 +342,30 @@ function TourDetailsModal({ tour, onClose }: { tour: Tour; onClose: () => void }
                             ))}
                             {!itineraryPreview.length && <p className="text-sm text-neutral-400">No itinerary configured.</p>}
                         </div>
+                    </section>
+                    <section className="rounded-xl border border-surface-border bg-surface-dark/30 p-4 space-y-3">
+                        <h4 className="font-semibold">Operational Assignments</h4>
+                        {options?.departures?.length ? (
+                            <>
+                                <div className="flex flex-wrap gap-2">
+                                    {options.departures.map((d) => (
+                                        <Button
+                                            key={d._id}
+                                            size="sm"
+                                            variant={selectedDepartureId === d._id ? 'primary' : 'outline'}
+                                            onClick={() => setSelectedDepartureId(d._id)}
+                                        >
+                                            {new Date(d.startsAt).toLocaleDateString()}
+                                        </Button>
+                                    ))}
+                                </div>
+                                {selectedDepartureId ? (
+                                    <DepartureAssignmentPanel departureId={selectedDepartureId} />
+                                ) : null}
+                            </>
+                        ) : (
+                            <p className="text-sm text-neutral-400">No departures found for this package yet.</p>
+                        )}
                     </section>
                 </div>
             </div>

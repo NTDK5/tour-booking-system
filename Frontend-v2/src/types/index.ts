@@ -192,6 +192,47 @@ export interface BookingQuoteResponse {
     }[];
 }
 
+export type StaffRole = 'guide' | 'driver' | 'coordinator' | 'translator' | 'support';
+export type StaffStatus = 'active' | 'inactive';
+export type StaffAvailability = 'available' | 'assigned' | 'on_leave' | 'unavailable';
+
+export interface Staff {
+    _id: string;
+    fullName: string;
+    email?: string;
+    phone?: string;
+    avatar?: string;
+    status: StaffStatus;
+    role: StaffRole;
+    availability: StaffAvailability;
+    skills?: {
+        languages?: string[];
+        destinations?: string[];
+        certifications?: string[];
+        licenseTypes?: string[];
+        vehicleTypes?: string[];
+        departments?: string[];
+    };
+    hireDate?: string;
+    notes?: string;
+    currentAssignmentsCount?: number;
+    lastAssignedAt?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface StaffAssignment {
+    _id: string;
+    staffId: string | Staff;
+    role: 'guide' | 'driver';
+    departureId: string;
+    bookingId?: string;
+    customTripId?: string;
+    startDate: string;
+    endDate: string;
+    status: 'active' | 'cancelled';
+}
+
 export interface Booking {
     _id: string;
     /** Enterprise human-readable ref */

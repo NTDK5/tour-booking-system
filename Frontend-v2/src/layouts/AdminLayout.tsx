@@ -6,6 +6,7 @@ import {
     Box,
     DollarSign,
     Users,
+    UserCheck,
     Settings,
     LogOut,
     Car,
@@ -47,6 +48,7 @@ const navGroups = [
         label: 'Operations',
         items: [
             { label: 'Custom Trips', icon: Sparkles, path: '/admin/custom-trips' },
+            { label: 'Staff', icon: UserCheck, path: '/admin/staff' },
             { label: 'Inventory', icon: Box, path: '/admin/inventory' },
             { label: 'Financials', icon: DollarSign, path: '/admin/financials' },
             { label: 'Users', icon: Users, path: '/admin/users' },

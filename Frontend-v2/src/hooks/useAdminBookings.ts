@@ -44,3 +44,27 @@ export function useUpdateBooking() {
         }
     });
 }
+
+export function useAdminUpdateBookingStatus() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            id,
+            lifecycleStatus,
+            reason,
+            refundAmount,
+        }: {
+            id: string;
+            lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+            reason?: string;
+            refundAmount?: number;
+        }) => bookingsApi.adminUpdateStatus(id, { lifecycleStatus, reason, refundAmount }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin'], exact: false });
+            toast.success('Booking lifecycle updated');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Failed to update lifecycle status');
+        },
+    });
+}

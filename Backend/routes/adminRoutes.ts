@@ -2,6 +2,8 @@ import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware';
 import adminPackageRoutes from './adminPackageRoutes';
 import adminBookingRoutes from './adminBookingRoutes';
+import adminStaffRoutes from '../modules/staff/routes/staff.routes';
+import assignmentRoutes from '../modules/assignments/routes/assignment.routes';
 import {
     getDashboardStats,
     getAvailability,
@@ -36,5 +38,7 @@ router.post('/calendar/check-availability', checkUnifiedResourceAvailability);
 router.use('/packages', adminPackageRoutes);
 
 router.use('/bookings', adminBookingRoutes);
+router.use('/staff', adminStaffRoutes);
+router.use('/', assignmentRoutes);
 
 export default router;

@@ -7,6 +7,7 @@ import {
     adminPatchAllocation,
     adminIssueVoucherStub,
     adminCancelBooking,
+    adminUpdateBookingStatus,
 } from '../controllers/adminBookingController';
 import { validate } from '../middleware/validationMiddleware';
 import { manualPaymentSchema } from '../schemas/bookingSchemas';
@@ -20,5 +21,6 @@ router.post('/:id/record-payment', validate(manualPaymentSchema), adminRecordMan
 router.patch('/:id/allocations', adminPatchAllocation);
 router.post('/:id/issue-voucher', adminIssueVoucherStub);
 router.post('/:id/cancel', adminCancelBooking);
+router.patch('/:id/status', adminUpdateBookingStatus);
 
 export default router;

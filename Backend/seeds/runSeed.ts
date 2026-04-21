@@ -22,13 +22,15 @@ import Lodge from '../models/lodgeModel';
 import Car from '../models/carModel';
 import Resource from '../models/resourceModel';
 import PackageDeparture from '../modules/packages/models/packageDepartureModel';
-import { SEED_USER_EMAILS } from './constants';
+import Staff from '../modules/staff/models/staff.model';
+import { SEED_STAFF_EMAILS, SEED_USER_EMAILS } from './constants';
 import { seedAdminUsers, DEFAULT_ADMIN_EMAIL } from './seeders/adminSeeder';
 import { seedCustomerUsers, DEFAULT_CUSTOMER_PASSWORD } from './seeders/customerSeeder';
 import { seedLodgesCarsAndResources } from './seeders/resourceSeeder';
 import { seedPackages } from './seeders/packageSeeder';
 import { seedDepartures } from './seeders/departureSeeder';
 import { seedBookings } from './seeders/bookingSeeder';
+import { seedStaffMembers } from './seeders/staffSeeder';
 
 const force = process.argv.includes('--force');
 
@@ -39,6 +41,7 @@ async function purgeSeedCollections() {
     await Resource.deleteMany({});
     await Car.deleteMany({});
     await Lodge.deleteMany({});
+    await Staff.deleteMany({ email: { $in: SEED_STAFF_EMAILS } });
     await User.deleteMany({ email: { $in: SEED_USER_EMAILS } });
 }
 
@@ -76,6 +79,9 @@ async function run() {
     console.log('Seeding lodges, fleet vehicles & unified resources (guides)…');
     await seedLodgesCarsAndResources();
 
+    console.log('Seeding staff resources…');
+    await seedStaffMembers();
+
     console.log('Seeding tour packages (6 flagship itineraries)…');
     const { byPackageCode } = await seedPackages();
 
@@ -92,6 +98,7 @@ async function run() {
     const pkgTotal = await Tour.countDocuments();
     const depTotal = await PackageDeparture.countDocuments();
     const bookTotal = await Booking.countDocuments();
+    const staffTotal = await Staff.countDocuments();
     const pendingBookings = await Booking.countDocuments({ status: 'pending' });
     const confirmedBookings = await Booking.countDocuments({ status: 'confirmed' });
     const confirmedRevenue = await Booking.aggregate([
@@ -104,6 +111,7 @@ async function run() {
     console.log(`  Packages (tours):     ${pkgTotal}`);
     console.log(`  Departures:           ${depTotal}`);
     console.log(`  Bookings (total):     ${bookTotal}`);
+    console.log(`  Staff (total):        ${staffTotal}`);
     console.log(`  Pending bookings:     ${pendingBookings}`);
     console.log(`  Confirmed bookings:   ${confirmedBookings}`);
     console.log(`  Paid revenue (confirmed, paid): USD ${confirmedRevenue[0]?.sum?.toFixed(2) ?? '0.00'}`);

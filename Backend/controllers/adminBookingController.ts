@@ -4,12 +4,13 @@ import Booking from '../models/bookingModel';
 import { ApiError } from '../utils/ApiError';
 import { toAdminBookingDTO } from '../modules/bookings/dto/bookingDto';
 import { appendLedgerEntry } from '../modules/bookings/payments/bookingPaymentService';
-import { cancelBookingWorkflow, confirmBookingWorkflow } from '../modules/bookings/workflow/bookingWorkflowService';
+import { cancelBookingWorkflow, confirmBookingWorkflow, markCompleted, markInProgress } from '../modules/bookings/workflow/bookingWorkflowService';
 import {
     assignGuide,
     assignVehicle,
     setAssignedHotels,
 } from '../modules/bookings/allocations/bookingAllocationService';
+import { appendBookingAudit } from '../modules/bookings/audit/bookingAuditService';
 
 export const adminListBookings = asyncHandler(async (req: any, res: any) => {
     const { lifecycleStatus, workflowStatus, search } = req.query as Record<string, string | undefined>;
@@ -142,6 +143,46 @@ export const adminCancelBooking = asyncHandler(async (req: any, res: any) => {
         refundAmount,
         performedBy: req.user?._id,
     });
+
+    await booking.save();
+    res.status(200).json(toAdminBookingDTO(booking));
+});
+
+export const adminUpdateBookingStatus = asyncHandler(async (req: any, res: any) => {
+    const { lifecycleStatus, reason, refundAmount } = req.body as {
+        lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+        reason?: string;
+        refundAmount?: number;
+    };
+
+    const booking = await Booking.findById(req.params.id);
+    if (!booking) throw new ApiError(404, 'Booking not found');
+
+    if (!lifecycleStatus) {
+        throw new ApiError(400, 'lifecycleStatus is required');
+    }
+
+    if (lifecycleStatus === 'cancelled') {
+        await cancelBookingWorkflow(booking, {
+            reason,
+            refundAmount,
+            performedBy: req.user?._id,
+        });
+    } else if (lifecycleStatus === 'confirmed') {
+        await confirmBookingWorkflow(booking, req.user?._id);
+    } else if (lifecycleStatus === 'in_progress') {
+        await markInProgress(booking, req.user?._id);
+    } else if (lifecycleStatus === 'completed') {
+        await markCompleted(booking, req.user?._id);
+    } else if (lifecycleStatus === 'pending') {
+        booking.lifecycleStatus = 'pending';
+        booking.status = 'pending' as any;
+        await appendBookingAudit(booking as any, {
+            action: 'booking_pending',
+            performedBy: req.user?._id,
+            notes: 'Booking moved to pending by admin',
+        });
+    }
 
     await booking.save();
     res.status(200).json(toAdminBookingDTO(booking));

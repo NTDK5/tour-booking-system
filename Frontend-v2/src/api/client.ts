@@ -1,5 +1,6 @@
 import axios, { type AxiosError } from 'axios';
 import type { ApiError } from '@/types';
+import { setAuthRedirectPayload } from '@/utils/authRedirect';
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:5000/api';
 
@@ -31,7 +32,9 @@ apiClient.interceptors.response.use(
     (error: AxiosError<ApiError>) => {
         if (error.response?.status === 401) {
             localStorage.removeItem('auth_user');
-            window.location.href = '/auth/login';
+            const returnTo = `${window.location.pathname}${window.location.search || ''}`;
+            setAuthRedirectPayload(returnTo);
+            window.location.href = `/auth/login?redirect=${encodeURIComponent(returnTo)}`;
         }
         return Promise.reject(error);
     },

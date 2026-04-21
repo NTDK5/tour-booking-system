@@ -10,6 +10,7 @@ import { authApi } from '@/api/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import toast from 'react-hot-toast';
+import { consumeAuthRedirectPayload } from '@/utils/authRedirect';
 
 const loginSchema = z.object({
     email: z.string().email('Please enter a valid email address'),
@@ -25,7 +26,9 @@ export function LoginPage() {
     const [isLoading, setIsLoading] = useState(false);
 
     // Where to redirect after login — honour the "from" state set by ProtectedRoute
-    const from = (location.state as any)?.from?.pathname || null;
+    const searchParams = new URLSearchParams(location.search);
+    const queryRedirect = searchParams.get('redirect');
+    const from = (location.state as any)?.from?.pathname || queryRedirect || null;
 
     const {
         register,
@@ -43,8 +46,12 @@ export function LoginPage() {
             toast.success('Welcome back to Dorze Tours!');
 
             // Redirect: to the original protected page, or admin, or home
-            if (from) {
-                navigate(from, { replace: true });
+            const pendingPayload = consumeAuthRedirectPayload();
+            if (from || pendingPayload?.returnTo) {
+                navigate((from || pendingPayload?.returnTo) as string, {
+                    replace: true,
+                    state: pendingPayload?.context ? { postLoginAction: pendingPayload.context } : undefined,
+                });
             } else if (authUser.role === 'admin') {
                 navigate('/admin', { replace: true });
             } else {

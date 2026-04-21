@@ -11,6 +11,8 @@ import Resource from '../models/resourceModel';
 import { checkResourceAvailability, getBookingsForCalendarRange } from '../services/resourceAvailabilityService';
 import { startOfDay, endOfDay, subDays, format, startOfMonth, endOfMonth } from 'date-fns';
 import { createAuditLog } from '../utils/auditLogger';
+import { generateBookingNumber } from '../modules/bookings/services/bookingNumberService';
+import { appendLedgerEntry, syncBookingPaymentFields } from '../modules/bookings/payments/bookingPaymentService';
 
 const isValidDate = (d: any) => d instanceof Date && !isNaN(d.getTime());
 
@@ -207,7 +209,16 @@ export const createOfflineBooking = asyncHandler(async (req: Request, res: Respo
         checkOutDate,
         bookingDate,
         internalNotes,
-        roomType
+        roomType,
+        departureId,
+        selectedAddons,
+        travelers,
+        children,
+        notes,
+        pricingSnapshot,
+        addOnLines,
+        lifecycleStatus,
+        status,
     } = req.body;
 
     // Find or create user for manual booking
@@ -235,8 +246,18 @@ export const createOfflineBooking = asyncHandler(async (req: Request, res: Respo
         paymentMethod: paymentMethod || 'cash',
         source: 'offline',
         internalNotes,
+        notes,
+        schemaVersion: 2,
+        bookingNumber: await generateBookingNumber(),
+        lifecycleStatus: lifecycleStatus || (status === 'cancelled' ? 'cancelled' : 'confirmed'),
+        status: status || 'confirmed',
+        pricingSnapshot: pricingSnapshot || undefined,
+        addOnLines: Array.isArray(addOnLines) ? addOnLines : undefined,
+        selectedAddons: Array.isArray(selectedAddons) ? selectedAddons : undefined,
+        travelers: Array.isArray(travelers) ? travelers : undefined,
+        workflow: { workflowStatus: 'admin_offline_entry', voucherIssued: false, documentsSent: false, operationsAssigned: false },
         history: [{
-            status: 'confirmed', // Manual bookings are usually confirmed immediately
+            status: status || 'confirmed',
             timestamp: new Date(),
             comment: 'Manual booking created by admin'
         }]
@@ -250,6 +271,8 @@ export const createOfflineBooking = asyncHandler(async (req: Request, res: Respo
     } else if (bookingType === 'Tour') {
         bookingData.tour = resourceId;
         bookingData.bookingDate = bookingDate;
+        bookingData.departureId = departureId || undefined;
+        bookingData.children = children || 0;
     } else if (bookingType === 'Car') {
         bookingData.car = resourceId;
         bookingData.checkInDate = checkInDate;
@@ -257,6 +280,21 @@ export const createOfflineBooking = asyncHandler(async (req: Request, res: Respo
     }
 
     const booking = await Booking.create(bookingData);
+
+    // Keep enterprise ledger/payment summary populated for offline entries.
+    if (Number(totalPrice) > 0 && paymentStatus !== 'unpaid') {
+        appendLedgerEntry(booking as any, {
+            paymentType: 'balance',
+            amount: Number(totalPrice),
+            currency: booking.pricingSnapshot?.currency || 'USD',
+            method: paymentMethod || 'manual',
+            status: paymentStatus === 'paid' ? 'completed' : 'pending',
+            provider: paymentMethod === 'paypal' ? 'paypal' : paymentMethod === 'cash' ? 'cash' : 'manual',
+            notes: 'Offline booking payment entry',
+        });
+        syncBookingPaymentFields(booking as any);
+        await booking.save();
+    }
 
     // Update availability
     // TODO: Implement a helper to update Availability records based on booking

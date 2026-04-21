@@ -9,7 +9,8 @@
     "dev": "ts-node-dev server.ts",
     "migrate:tours": "ts-node modules/migration/migrateToursToPackages.ts",
     "seed": "ts-node seeds/runSeed.ts",
-    "seed:force": "ts-node seeds/runSeed.ts --force"
+    "seed:force": "ts-node seeds/runSeed.ts --force",
+    "seed:staff": "ts-node seeds/runStaffSeed.ts"
   },
   "keywords": [],
   "author": "",

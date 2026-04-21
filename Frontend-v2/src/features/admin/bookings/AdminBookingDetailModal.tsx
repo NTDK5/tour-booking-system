@@ -5,6 +5,8 @@ import { Badge } from '@/components/ui/Badge';
 import { format } from 'date-fns';
 import type { Booking } from '@/types';
 import { useAdminBookingDetail } from '@/hooks/useAdminBookingDetail';
+import { useAdminUpdateBookingStatus } from '@/hooks/useAdminBookings';
+import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 
 const TABS = ['Summary', 'Travelers', 'Pricing', 'Payments', 'Allocations', 'Documents', 'Audit'] as const;
 type TabId = (typeof TABS)[number];
@@ -84,7 +86,9 @@ export function AdminBookingDetailModal({
     onClose: () => void;
 }) {
     const [tab, setTab] = useState<TabId>('Summary');
+    const [status, setStatus] = useState('');
     const { data: booking, isLoading, isError } = useAdminBookingDetail(bookingId);
+    const updateStatus = useAdminUpdateBookingStatus();
 
     if (!bookingId) return null;
 
@@ -98,9 +102,29 @@ export function AdminBookingDetailModal({
                             {booking?.bookingNumber || `#${bookingId.slice(-8).toUpperCase()}`}
                         </p>
                     </div>
-                    <Button variant="ghost" onClick={onClose}>
-                        Close
-                    </Button>
+                    <div className="flex items-center gap-2">
+                        <div className="w-44">
+                            <AccessibleSelect
+                                value={status || booking?.lifecycleStatus || 'pending'}
+                                onChange={setStatus}
+                                options={[
+                                    { value: 'pending', label: 'Pending' },
+                                    { value: 'confirmed', label: 'Confirmed' },
+                                    { value: 'in_progress', label: 'In progress' },
+                                    { value: 'completed', label: 'Completed' },
+                                    { value: 'cancelled', label: 'Cancelled' },
+                                ]}
+                            />
+                        </div>
+                        <Button
+                            variant="outline"
+                            onClick={() => booking && updateStatus.mutate({ id: booking._id, lifecycleStatus: (status || booking.lifecycleStatus || 'pending') as any })}
+                            isLoading={updateStatus.isPending}
+                        >
+                            Update Status
+                        </Button>
+                        <Button variant="ghost" onClick={onClose}>Close</Button>
+                    </div>
                 </div>
 
                 <div className="flex flex-wrap gap-2 px-6 pt-4 border-b border-surface-border">

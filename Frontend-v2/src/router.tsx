@@ -25,6 +25,9 @@ import BookingPage from '@/pages/BookingPage';
 import ProfilePage from '@/features/dashboard/ProfilePage';
 import BookingHistoryPage from '@/features/dashboard/BookingHistoryPage';
 import CustomTripRequestDetailPage from '@/features/dashboard/CustomTripRequestDetailPage';
+import StaffListPage from '@/features/admin/staff/StaffListPage';
+import StaffFormPage from '@/features/admin/staff/StaffFormPage';
+import StaffDetailsPage from '@/features/admin/staff/StaffDetailsPage';
 import AboutPage from '@/pages/AboutPage';
 import GalleryPage from '@/pages/GalleryPage';
 import ContactPage from '@/pages/ContactPage';
@@ -97,6 +100,10 @@ export const router = createBrowserRouter([
             { path: 'inventory', element: <ReportingPage /> },
             { path: 'financials', element: <PricingRulesPage /> },
             { path: 'users', element: <UserManagementPage /> },
+            { path: 'staff', element: <StaffListPage /> },
+            { path: 'staff/new', element: <StaffFormPage /> },
+            { path: 'staff/:id', element: <StaffDetailsPage /> },
+            { path: 'staff/:id/edit', element: <StaffFormPage /> },
             { path: 'logs', element: <AuditLogPage /> },
         ],
     },
