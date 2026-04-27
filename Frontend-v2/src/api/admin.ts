@@ -1,4 +1,5 @@
 import { apiClient as client } from './client';
+import type { CalendarEventType } from '@/types/adminCalendar';
 
 export const adminApi = {
     getStats: () => client.get('/admin/stats'),
@@ -33,6 +34,16 @@ export const adminApi = {
         resourceType?: string;
         resourceId?: string;
     }) => client.get('/admin/calendar/bookings', { params }),
+    getUnifiedCalendarEvents: (params: {
+        start: string;
+        end: string;
+        packageId?: string;
+        guideId?: string;
+        driverId?: string;
+        vehicleId?: string;
+        status?: string;
+        eventType?: CalendarEventType;
+    }) => client.get('/admin/calendar/events', { params }),
     checkUnifiedResourceAvailability: (data: {
         resourceId: string;
         resourceType: string;

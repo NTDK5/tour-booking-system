@@ -150,7 +150,7 @@ export const adminCancelBooking = asyncHandler(async (req: any, res: any) => {
 
 export const adminUpdateBookingStatus = asyncHandler(async (req: any, res: any) => {
     const { lifecycleStatus, reason, refundAmount } = req.body as {
-        lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+        lifecycleStatus: 'draft' | 'pending_payment' | 'confirmed' | 'completed' | 'cancelled';
         reason?: string;
         refundAmount?: number;
     };
@@ -174,13 +174,13 @@ export const adminUpdateBookingStatus = asyncHandler(async (req: any, res: any) 
         await markInProgress(booking, req.user?._id);
     } else if (lifecycleStatus === 'completed') {
         await markCompleted(booking, req.user?._id);
-    } else if (lifecycleStatus === 'pending') {
-        booking.lifecycleStatus = 'pending';
-        booking.status = 'pending' as any;
+    } else if (lifecycleStatus === 'pending_payment' || lifecycleStatus === 'draft') {
+        booking.lifecycleStatus = lifecycleStatus;
+        booking.status = lifecycleStatus as any;
         await appendBookingAudit(booking as any, {
-            action: 'booking_pending',
+            action: lifecycleStatus === 'draft' ? 'booking_draft' : 'booking_pending_payment',
             performedBy: req.user?._id,
-            notes: 'Booking moved to pending by admin',
+            notes: `Booking moved to ${lifecycleStatus} by admin`,
         });
     }
 

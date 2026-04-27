@@ -237,7 +237,7 @@ export interface Booking {
     _id: string;
     /** Enterprise human-readable ref */
     bookingNumber?: string;
-    lifecycleStatus?: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+    lifecycleStatus?: 'draft' | 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
     inventoryPhase?: 'none' | 'reserved' | 'confirmed' | 'released';
     pricingSnapshot?: PricingSnapshot;
     paymentLedger?: PaymentLedgerEntry[];
@@ -338,6 +338,8 @@ export interface Booking {
 }
 
 export type BookingStatus =
+    | 'draft'
+    | 'pending_payment'
     | 'pending'
     | 'under_review'
     | 'offer_sent'

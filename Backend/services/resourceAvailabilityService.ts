@@ -1,7 +1,7 @@
 import { startOfDay } from 'date-fns';
 import Booking from '../models/bookingModel';
 
-const ACTIVE_BOOKING_STATUSES = ['pending', 'under_review', 'offer_sent', 'submitted', 'offered', 'accepted', 'confirmed'];
+const ACTIVE_BOOKING_STATUSES = ['pending_payment', 'confirmed'];
 
 type ResourceRef = {
     resourceId: string;

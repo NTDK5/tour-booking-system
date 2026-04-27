@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/Badge';
 import { format } from 'date-fns';
 import type { Booking } from '@/types';
 import { useAdminBookingDetail } from '@/hooks/useAdminBookingDetail';
-import { useAdminUpdateBookingStatus } from '@/hooks/useAdminBookings';
+import { useAdminPatchBookingAllocation, useAdminUpdateBookingStatus } from '@/hooks/useAdminBookings';
 import { AccessibleSelect } from '@/components/ui/AccessibleSelect';
 
 const TABS = ['Summary', 'Travelers', 'Pricing', 'Payments', 'Allocations', 'Documents', 'Audit'] as const;
@@ -87,8 +87,11 @@ export function AdminBookingDetailModal({
 }) {
     const [tab, setTab] = useState<TabId>('Summary');
     const [status, setStatus] = useState('');
+    const [guideId, setGuideId] = useState('');
+    const [vehicleId, setVehicleId] = useState('');
     const { data: booking, isLoading, isError } = useAdminBookingDetail(bookingId);
     const updateStatus = useAdminUpdateBookingStatus();
+    const patchAllocation = useAdminPatchBookingAllocation();
 
     if (!bookingId) return null;
 
@@ -108,9 +111,9 @@ export function AdminBookingDetailModal({
                                 value={status || booking?.lifecycleStatus || 'pending'}
                                 onChange={setStatus}
                                 options={[
-                                    { value: 'pending', label: 'Pending' },
+                                    { value: 'draft', label: 'Draft' },
+                                    { value: 'pending_payment', label: 'Pending payment' },
                                     { value: 'confirmed', label: 'Confirmed' },
-                                    { value: 'in_progress', label: 'In progress' },
                                     { value: 'completed', label: 'Completed' },
                                     { value: 'cancelled', label: 'Cancelled' },
                                 ]}
@@ -118,7 +121,7 @@ export function AdminBookingDetailModal({
                         </div>
                         <Button
                             variant="outline"
-                            onClick={() => booking && updateStatus.mutate({ id: booking._id, lifecycleStatus: (status || booking.lifecycleStatus || 'pending') as any })}
+                            onClick={() => booking && updateStatus.mutate({ id: booking._id, lifecycleStatus: (status || booking.lifecycleStatus || 'draft') as any })}
                             isLoading={updateStatus.isPending}
                         >
                             Update Status
@@ -280,9 +283,37 @@ export function AdminBookingDetailModal({
                                         <span className="text-neutral-500">Vehicle: </span>
                                         {booking.assignedVehicle ? String(booking.assignedVehicle) : '—'}
                                     </p>
-                                    <p className="text-neutral-400 text-xs">
-                                        Assign resources via PATCH /api/admin/bookings/:id/allocations
-                                    </p>
+                                    <div className="grid md:grid-cols-2 gap-3">
+                                        <input
+                                            value={guideId}
+                                            onChange={(e) => setGuideId(e.target.value)}
+                                            placeholder="Guide ID"
+                                            className="h-10 px-3 rounded-lg bg-surface border border-surface-border"
+                                        />
+                                        <input
+                                            value={vehicleId}
+                                            onChange={(e) => setVehicleId(e.target.value)}
+                                            placeholder="Vehicle ID"
+                                            className="h-10 px-3 rounded-lg bg-surface border border-surface-border"
+                                        />
+                                    </div>
+                                    <div className="flex gap-2">
+                                        <Button
+                                            onClick={() =>
+                                                patchAllocation.mutate({
+                                                    id: booking._id,
+                                                    guideId: guideId || undefined,
+                                                    vehicleId: vehicleId || undefined,
+                                                })
+                                            }
+                                            isLoading={patchAllocation.isPending}
+                                        >
+                                            Apply Allocation
+                                        </Button>
+                                        <p className="text-neutral-400 text-xs self-center">
+                                            Inline allocation patch (guide/vehicle).
+                                        </p>
+                                    </div>
                                 </div>
                             )}
                             {tab === 'Documents' && (

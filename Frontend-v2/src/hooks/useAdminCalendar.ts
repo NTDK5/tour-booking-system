@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { adminApi } from '@/api/admin';
 import toast from 'react-hot-toast';
+import type { CalendarEventType, UnifiedCalendarEventsResponse } from '@/types/adminCalendar';
 
 export function useUnifiedCalendarBookings(params: {
     start: string;
@@ -12,6 +13,26 @@ export function useUnifiedCalendarBookings(params: {
         queryKey: ['admin', 'calendar', 'bookings', params],
         queryFn: async () => {
             const { data } = await adminApi.getUnifiedCalendarBookings(params);
+            return data;
+        },
+        enabled: !!params.start && !!params.end,
+    });
+}
+
+export function useUnifiedCalendarEvents(params: {
+    start: string;
+    end: string;
+    packageId?: string;
+    guideId?: string;
+    driverId?: string;
+    vehicleId?: string;
+    status?: string;
+    eventType?: CalendarEventType;
+}) {
+    return useQuery<UnifiedCalendarEventsResponse>({
+        queryKey: ['admin', 'calendar', 'events', params],
+        queryFn: async () => {
+            const { data } = await adminApi.getUnifiedCalendarEvents(params);
             return data;
         },
         enabled: !!params.start && !!params.end,

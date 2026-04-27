@@ -62,7 +62,7 @@ export const manualPaymentSchema = z.object({
 });
 
 export const updateBookingSchema = z.object({
-    status: z.enum(['pending', 'under_review', 'offer_sent', 'confirmed', 'cancelled', 'expired', 'refunded', 'submitted', 'offered', 'accepted', 'rejected']).optional(),
+    status: z.enum(['draft', 'pending_payment', 'confirmed', 'cancelled', 'completed']).optional(),
     proposedPrice: z.number().nonnegative().optional(),
     notes: z.string().max(500).optional(),
     comment: z.string().max(500).optional(),

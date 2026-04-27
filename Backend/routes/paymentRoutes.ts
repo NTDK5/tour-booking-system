@@ -4,6 +4,7 @@ import {
     createPayPalOrder,
     capturePayPalPayment,
     createStripeIntent,
+    getStripeIntentStatus,
     handleStripeWebhook,
 } from '../controllers/paymentController';
 
@@ -12,6 +13,7 @@ const router = express.Router();
 router.post('/create-paypal-order', protect, createPayPalOrder);
 router.post('/capture-paypal', protect, capturePayPalPayment);
 router.post('/create-stripe-intent', protect, createStripeIntent);
+router.get('/stripe-intent/:intentId', protect, getStripeIntentStatus);
 
 // Webhook (No protect, uses Stripe signature)
 // Webhook is handled in server.ts for raw body parsing

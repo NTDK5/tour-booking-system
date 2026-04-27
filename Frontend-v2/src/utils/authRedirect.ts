@@ -6,6 +6,7 @@ export type OperationalActionContext = {
 };
 
 const KEY = 'auth_redirect_payload';
+const AUTH_PATH_PREFIX = '/auth';
 
 export function setAuthRedirectPayload(returnTo: string, context?: OperationalActionContext) {
     try {
@@ -32,4 +33,20 @@ export function consumeAuthRedirectPayload(): { returnTo?: string; context?: Ope
         // noop
     }
     return payload;
+}
+
+export function sanitizeRedirectTarget(target?: string | null): string | null {
+    if (!target) return null;
+
+    const trimmed = target.trim();
+    if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return null;
+
+    try {
+        const url = new URL(trimmed, window.location.origin);
+        if (url.origin !== window.location.origin) return null;
+        if (url.pathname.startsWith(AUTH_PATH_PREFIX)) return null;
+        return `${url.pathname}${url.search}${url.hash}`;
+    } catch {
+        return null;
+    }
 }

@@ -22,6 +22,8 @@ import ToursPage from '@/pages/ToursPage';
 import TourDetailPage from '@/pages/TourDetailPage';
 import LodgeDetailPage from '@/pages/LodgeDetailPage';
 import BookingPage from '@/pages/BookingPage';
+import BookingConfirmationPage from '@/pages/BookingConfirmationPage';
+import PaymentRetryPage from '@/pages/PaymentRetryPage';
 import ProfilePage from '@/features/dashboard/ProfilePage';
 import BookingHistoryPage from '@/features/dashboard/BookingHistoryPage';
 import CustomTripRequestDetailPage from '@/features/dashboard/CustomTripRequestDetailPage';
@@ -54,6 +56,22 @@ export const router = createBrowserRouter([
                 element: (
                     <ProtectedRoute>
                         <BookingPage />
+                    </ProtectedRoute>
+                )
+            },
+            {
+                path: 'booking/:tourId/confirmation',
+                element: (
+                    <ProtectedRoute>
+                        <BookingConfirmationPage />
+                    </ProtectedRoute>
+                )
+            },
+            {
+                path: 'booking/:tourId/payment-retry',
+                element: (
+                    <ProtectedRoute>
+                        <PaymentRetryPage />
                     </ProtectedRoute>
                 )
             },

@@ -80,9 +80,10 @@ export async function cancelBookingWorkflow(
 }
 
 export async function markInProgress(booking: IBooking, performedBy?: mongoose.Types.ObjectId): Promise<void> {
-    booking.lifecycleStatus = 'in_progress';
+    booking.lifecycleStatus = 'confirmed';
+    syncLegacyStatus(booking, 'confirmed');
     await appendBookingAudit(booking, {
-        action: 'booking_in_progress',
+        action: 'booking_confirmed_progress',
         performedBy,
     });
 }

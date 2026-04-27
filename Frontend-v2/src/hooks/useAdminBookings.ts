@@ -55,7 +55,7 @@ export function useAdminUpdateBookingStatus() {
             refundAmount,
         }: {
             id: string;
-            lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
+            lifecycleStatus: 'draft' | 'pending_payment' | 'confirmed' | 'completed' | 'cancelled';
             reason?: string;
             refundAmount?: number;
         }) => bookingsApi.adminUpdateStatus(id, { lifecycleStatus, reason, refundAmount }),
@@ -65,6 +65,28 @@ export function useAdminUpdateBookingStatus() {
         },
         onError: (error: any) => {
             toast.error(error.response?.data?.message || 'Failed to update lifecycle status');
+        },
+    });
+}
+
+export function useAdminPatchBookingAllocation() {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: ({
+            id,
+            guideId,
+            vehicleId,
+        }: {
+            id: string;
+            guideId?: string;
+            vehicleId?: string;
+        }) => apiClient.patch(`/admin/bookings/${id}/allocations`, { guideId, vehicleId }),
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: ['admin'], exact: false });
+            toast.success('Booking allocation updated');
+        },
+        onError: (error: any) => {
+            toast.error(error.response?.data?.message || 'Failed to update allocation');
         },
     });
 }

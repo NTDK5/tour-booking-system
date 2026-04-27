@@ -46,7 +46,7 @@ export default function CarsPage() {
         if (!selectedCar) return;
         if (!isAuthenticated) {
             toast.error('Please sign in to continue with booking.');
-            navigate('/login');
+            navigate('/auth/login');
             return;
         }
         createBooking({

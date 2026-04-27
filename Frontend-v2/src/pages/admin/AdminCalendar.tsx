@@ -33,22 +33,29 @@ import {
 } from 'date-fns';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { useResources, useSyncResources, useUnifiedCalendarBookings } from '@/hooks/useAdminCalendar';
+import { useCheckUnifiedResourceAvailability, useResources, useSyncResources, useUnifiedCalendarEvents } from '@/hooks/useAdminCalendar';
+import type { UnifiedCalendarEvent } from '@/types/adminCalendar';
+import { useNavigate } from 'react-router-dom';
+import { useCreateAssignment } from '@/hooks/useAssignments';
+import { useAdminPatchBookingAllocation } from '@/hooks/useAdminBookings';
 
 type ResourceType = 'Lodge' | 'Tour' | 'Car';
 type CalendarView = 'day' | 'week' | 'month';
-
 import { useAvailability } from '@/hooks/useAvailability';
 
 export default function AdminCalendar() {
+    const navigate = useNavigate();
     const [currentMonth, setCurrentMonth] = useState(new Date());
     const [calendarView, setCalendarView] = useState<CalendarView>('month');
     const [selectedType, setSelectedType] = useState<ResourceType>('Lodge');
     const [selectedResourceId, setSelectedResourceId] = useState<string>('');
     const [isFilterOpen, setIsFilterOpen] = useState(false);
-    const [selectedDayBookings, setSelectedDayBookings] = useState<any[] | null>(null);
-    const [selectedBookingDetail, setSelectedBookingDetail] = useState<any | null>(null);
+    const [selectedDayEvents, setSelectedDayEvents] = useState<UnifiedCalendarEvent[] | null>(null);
+    const [selectedEventDetail, setSelectedEventDetail] = useState<UnifiedCalendarEvent | null>(null);
     const syncResources = useSyncResources();
+    const createAssignment = useCreateAssignment();
+    const patchAllocation = useAdminPatchBookingAllocation();
+    const checkAvailability = useCheckUnifiedResourceAvailability();
 
     const range = useMemo(() => {
         if (calendarView === 'day') {
@@ -79,45 +86,62 @@ export default function AdminCalendar() {
         resourceId: selectedResourceId || undefined,
     });
     const { data: resources = [] } = useResources({ resourceType: selectedType });
-    const { data: bookings = [], isLoading: bookingsLoading } = useUnifiedCalendarBookings({
+    const { data: eventsPayload, isLoading: eventsLoading } = useUnifiedCalendarEvents({
         start: range.start.toISOString(),
         end: range.end.toISOString(),
-        resourceType: selectedType,
-        resourceId: selectedResourceId || undefined,
+        eventType: undefined,
+    });
+    const events = eventsPayload?.events || [];
+
+    const scopedEvents = useMemo(() => {
+        return events.filter((event: UnifiedCalendarEvent) => {
+            if (selectedType === 'Tour') return true;
+            if (selectedType === 'Car') {
+                return event.eventType === 'vehicle_assignment' || event.relatedVehicleIds?.length > 0;
+            }
+            if (selectedType === 'Lodge') {
+                return event.eventType === 'booking' && (event.metadata as { bookingType?: string } | undefined)?.bookingType === 'Lodge';
+            }
+            return true;
+        }).filter((event: UnifiedCalendarEvent) => {
+            if (!selectedResourceId) return true;
+            const relatedIds = [
+                ...(event.relatedVehicleIds || []),
+                ...(event.relatedStaffIds || []),
+                event.relatedDepartureId,
+            ].filter(Boolean).map(String);
+            return relatedIds.includes(selectedResourceId);
+        });
     });
 
     const getDayContent = (day: Date) => {
         return availability.find((a: any) => isSameDay(new Date(a.date), day));
     };
 
-    const getDayBookings = (day: Date) => {
-        return (bookings || []).filter((booking: any) => {
-            const type = String(booking?.resource?.resourceType || booking.bookingType || '').toLowerCase();
-            const selected = selectedType.toLowerCase();
-            if (type !== selected) return false;
-            const start = booking.startDate || booking.checkInDate || booking.bookingDate || booking.createdAt;
-            const end = booking.endDate || booking.checkOutDate || start;
-            if (!start) return false;
-            const dayTime = startOfDay(day).getTime();
-            return new Date(start).getTime() <= dayTime && new Date(end).getTime() >= dayTime;
+    const getDayEvents = (day: Date) => {
+        return scopedEvents.filter((event: UnifiedCalendarEvent) => {
+            const start = event.start;
+            const end = event.end || event.start;
+            if (!start || !end) return false;
+            const dayStart = startOfDay(day).getTime();
+            const dayEnd = endOfDay(day).getTime();
+            return new Date(start).getTime() <= dayEnd && new Date(end).getTime() >= dayStart;
         });
     };
 
     const getDaySummary = (day: Date) => {
         const content = getDayContent(day);
-        const dayBookings = getDayBookings(day);
-        const bookingCount = dayBookings.length;
-        // Group bookings by resource to detect same-resource overlap conflicts.
+        const dayEvents = getDayEvents(day);
+        const bookingCount = dayEvents.filter((event: UnifiedCalendarEvent) => event.eventType === 'booking').length;
+        const alertCount = dayEvents.filter((event: UnifiedCalendarEvent) => event.eventType === 'operational_alert').length;
+
+        // Group vehicle assignment events by vehicle to detect overlap conflicts.
         const resourceCounter = new Map<string, number>();
-        dayBookings.forEach((booking: any) => {
-            const resourceKey = String(
-                booking?.resource?.resourceId ||
-                booking?.tour?._id ||
-                booking?.lodge?._id ||
-                booking?.car?._id ||
-                'unknown'
-            );
-            resourceCounter.set(resourceKey, (resourceCounter.get(resourceKey) || 0) + 1);
+        dayEvents
+            .filter((event: UnifiedCalendarEvent) => event.eventType === 'vehicle_assignment')
+            .forEach((event: UnifiedCalendarEvent) => {
+                const vehicleKey = String(event.relatedVehicleIds?.[0] || 'unknown');
+                resourceCounter.set(vehicleKey, (resourceCounter.get(vehicleKey) || 0) + 1);
         });
         const conflictCount = Array.from(resourceCounter.values()).filter((count) => count > 1).length;
 
@@ -142,16 +166,54 @@ export default function AdminCalendar() {
             ? 'bg-success/10 text-success'
             : 'bg-error/10 text-error';
 
-        return { content, dayBookings, bookingCount, label, style, conflictCount, highDemand };
+        return { content, dayEvents, bookingCount, alertCount, label, style, conflictCount, highDemand };
     };
 
-    if (isLoading || bookingsLoading) {
+    if (isLoading || eventsLoading) {
         return (
             <div className="min-h-[600px] flex items-center justify-center bg-surface">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
             </div>
         );
     }
+
+    const assignStaffFromEvent = async (event: UnifiedCalendarEvent, role: 'guide' | 'driver') => {
+        const staffId = window.prompt(`Enter ${role} staff ID`);
+        if (!staffId || !event.relatedDepartureId) return;
+
+        await createAssignment.mutateAsync({
+            staffId,
+            role,
+            departureId: event.relatedDepartureId,
+            startDate: event.start,
+            endDate: event.end,
+        });
+        setSelectedEventDetail(null);
+    };
+
+    const assignVehicleFromEvent = async (event: UnifiedCalendarEvent) => {
+        const vehicleId = window.prompt('Enter vehicle ID');
+        if (!vehicleId) return;
+
+        if (event.relatedBookingId) {
+            await patchAllocation.mutateAsync({ id: event.relatedBookingId, vehicleId });
+            setSelectedEventDetail(null);
+            return;
+        }
+
+        if (event.relatedDepartureId) {
+            const check = await checkAvailability.mutateAsync({
+                resourceId: vehicleId,
+                resourceType: 'Car',
+                startDate: event.start,
+                endDate: event.end,
+            });
+            if (!check.available) {
+                window.alert('Vehicle has a conflict in selected window.');
+                return;
+            }
+        }
+    };
 
     return (
         <div className="space-y-6">
@@ -285,7 +347,7 @@ export default function AdminCalendar() {
                                         {format(day, 'd')}
                                     </span>
                                     <Badge variant="outline" className="text-[9px]">
-                                        {summary.bookingCount}
+                                        {summary.dayEvents.length}
                                     </Badge>
                                 </div>
 
@@ -298,6 +360,11 @@ export default function AdminCalendar() {
                                     {summary.highDemand && (
                                         <div className="p-1 rounded-md bg-amber-500/15 text-amber-400 text-[10px] font-bold text-center border border-amber-400/30">
                                             High Demand
+                                        </div>
+                                    )}
+                                    {summary.alertCount > 0 && (
+                                        <div className="p-1 rounded-md bg-orange-500/15 text-orange-300 text-[10px] font-bold text-center border border-orange-400/30">
+                                            {summary.alertCount} alert{summary.alertCount > 1 ? 's' : ''}
                                         </div>
                                     )}
                                     {content ? (
@@ -319,7 +386,7 @@ export default function AdminCalendar() {
                                         {summary.bookingCount} bookings
                                     </div>
                                     <button
-                                        onClick={() => setSelectedDayBookings(summary.dayBookings)}
+                                        onClick={() => setSelectedDayEvents(summary.dayEvents)}
                                         className="mt-1 text-[10px] px-2 py-1 rounded-md border border-surface-border hover:border-primary"
                                     >
                                         Show details
@@ -355,31 +422,31 @@ export default function AdminCalendar() {
                 </div>
             </div>
 
-            {selectedDayBookings && (
+            {selectedDayEvents && (
                 <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[200] flex items-center justify-center p-4">
                     <div className="w-full max-w-2xl bg-surface-light border border-surface-border rounded-2xl p-6">
                         <div className="flex items-center justify-between mb-4">
-                            <h3 className="text-xl font-bold">Day Booking Details</h3>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedDayBookings(null)}>Close</Button>
+                            <h3 className="text-xl font-bold">Day Event Details</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedDayEvents(null)}>Close</Button>
                         </div>
-                        {selectedDayBookings.length === 0 ? (
-                            <p className="text-sm text-neutral-400">No bookings for this date.</p>
+                        {selectedDayEvents.length === 0 ? (
+                            <p className="text-sm text-neutral-400">No events for this date.</p>
                         ) : (
                             <div className="space-y-3 max-h-[55vh] overflow-y-auto">
-                                {selectedDayBookings.map((b: any) => (
-                                    <div key={b._id} className="p-3 rounded-xl bg-surface border border-surface-border">
+                                {selectedDayEvents.map((event: UnifiedCalendarEvent) => (
+                                    <div key={event.id} className="p-3 rounded-xl bg-surface border border-surface-border">
                                         <div className="flex items-center justify-between gap-3">
                                             <p className="font-bold text-sm">
-                                                {(b.tour as any)?.title || (b.lodge as any)?.name || (b.car as any)?.brand || (b.customTrip ? 'Custom Trip' : 'Booking')}
+                                                {event.title}
                                             </p>
-                                            <Badge variant="outline">{b.status}</Badge>
+                                            <Badge variant="outline">{event.eventType.replace('_', ' ')}</Badge>
                                         </div>
                                         <p className="text-xs text-neutral-500 mt-1">
-                                            #{b._id.slice(-8).toUpperCase()} | {(b.user as any)?.first_name || 'Guest'} {(b.user as any)?.last_name || ''}
+                                            {event.status} | {format(new Date(event.start), 'MMM dd, yyyy')}
                                         </p>
                                         <div className="mt-3 flex justify-end">
-                                            <Button size="sm" variant="outline" onClick={() => setSelectedBookingDetail(b)}>
-                                                View Booking Details
+                                            <Button size="sm" variant="outline" onClick={() => setSelectedEventDetail(event)}>
+                                                View Event Details
                                             </Button>
                                         </div>
                                     </div>
@@ -390,53 +457,58 @@ export default function AdminCalendar() {
                 </div>
             )}
 
-            {selectedBookingDetail && (
+            {selectedEventDetail && (
                 <div className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[210] flex items-center justify-center p-4">
                     <div className="w-full max-w-2xl bg-surface-light border border-surface-border rounded-2xl p-6 space-y-5">
                         <div className="flex items-center justify-between">
-                            <h3 className="text-xl font-bold">Booking Detail</h3>
-                            <Button variant="ghost" size="sm" onClick={() => setSelectedBookingDetail(null)}>Close</Button>
+                            <h3 className="text-xl font-bold">Event Detail</h3>
+                            <Button variant="ghost" size="sm" onClick={() => setSelectedEventDetail(null)}>Close</Button>
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
-                            <div><p className="text-neutral-500">Booking ID</p><p className="font-bold">#{selectedBookingDetail._id.slice(-8).toUpperCase()}</p></div>
-                            <div><p className="text-neutral-500">Status</p><p className="font-bold uppercase">{selectedBookingDetail.status}</p></div>
-                            <div><p className="text-neutral-500">Type</p><p className="font-bold uppercase">{selectedBookingDetail.customTrip ? 'custom' : selectedBookingDetail.bookingType}</p></div>
-                            <div><p className="text-neutral-500">Total Price</p><p className="font-bold">{selectedBookingDetail.totalPrice > 0 ? `$${selectedBookingDetail.totalPrice}` : 'TBD'}</p></div>
-                            <div><p className="text-neutral-500">Booking Date</p><p className="font-bold">{selectedBookingDetail.bookingDate ? format(new Date(selectedBookingDetail.bookingDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
-                            <div><p className="text-neutral-500">Check-in</p><p className="font-bold">{selectedBookingDetail.checkInDate ? format(new Date(selectedBookingDetail.checkInDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
-                            <div><p className="text-neutral-500">Check-out</p><p className="font-bold">{selectedBookingDetail.checkOutDate ? format(new Date(selectedBookingDetail.checkOutDate), 'MMM dd, yyyy') : 'N/A'}</p></div>
-                            <div><p className="text-neutral-500">Guests</p><p className="font-bold">{selectedBookingDetail.numberOfPeople || 1}</p></div>
+                            <div><p className="text-neutral-500">Event ID</p><p className="font-bold">{selectedEventDetail.id}</p></div>
+                            <div><p className="text-neutral-500">Status</p><p className="font-bold uppercase">{selectedEventDetail.status}</p></div>
+                            <div><p className="text-neutral-500">Type</p><p className="font-bold uppercase">{selectedEventDetail.eventType}</p></div>
+                            <div><p className="text-neutral-500">Severity</p><p className="font-bold uppercase">{selectedEventDetail.severity}</p></div>
+                            <div><p className="text-neutral-500">Start</p><p className="font-bold">{format(new Date(selectedEventDetail.start), 'MMM dd, yyyy')}</p></div>
+                            <div><p className="text-neutral-500">End</p><p className="font-bold">{format(new Date(selectedEventDetail.end), 'MMM dd, yyyy')}</p></div>
+                            <div><p className="text-neutral-500">Departure</p><p className="font-bold">{selectedEventDetail.relatedDepartureId || 'N/A'}</p></div>
+                            <div><p className="text-neutral-500">Booking</p><p className="font-bold">{selectedEventDetail.relatedBookingId || 'N/A'}</p></div>
                         </div>
 
-                        <div className="p-4 rounded-xl bg-surface border border-surface-border">
-                            <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Guest</p>
-                            <p className="text-sm font-bold">
-                                {(selectedBookingDetail.user as any)?.first_name || 'Guest'} {(selectedBookingDetail.user as any)?.last_name || ''}
-                            </p>
-                            <p className="text-xs text-neutral-500 mt-1">{(selectedBookingDetail.user as any)?.email || 'No email'}</p>
+                        {Array.isArray(selectedEventDetail.alerts) && selectedEventDetail.alerts.length > 0 && (
+                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
+                                <p className="text-xs uppercase text-neutral-500 font-bold mb-2">Alerts</p>
+                                <div className="space-y-2">
+                                    {selectedEventDetail.alerts.map((alert, idx: number) => (
+                                        <p key={idx} className="text-sm">
+                                            {alert.code}: {alert.message}
+                                        </p>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                        <div className="flex flex-wrap gap-2">
+                            <Button size="sm" onClick={() => assignStaffFromEvent(selectedEventDetail, 'guide')} isLoading={createAssignment.isPending}>
+                                Assign Guide
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => assignStaffFromEvent(selectedEventDetail, 'driver')} isLoading={createAssignment.isPending}>
+                                Assign Driver
+                            </Button>
+                            <Button size="sm" variant="outline" onClick={() => assignVehicleFromEvent(selectedEventDetail)} isLoading={patchAllocation.isPending || checkAvailability.isPending}>
+                                Assign Vehicle
+                            </Button>
+                            {selectedEventDetail.relatedBookingId && (
+                                <Button size="sm" variant="ghost" onClick={() => navigate('/admin/bookings')}>
+                                    View Booking
+                                </Button>
+                            )}
+                            {selectedEventDetail.eventType === 'operational_alert' && (
+                                <Button size="sm" variant="ghost" onClick={() => setSelectedEventDetail(null)}>
+                                    Resolve Alert
+                                </Button>
+                            )}
                         </div>
-
-                        {(selectedBookingDetail.tour || selectedBookingDetail.lodge || selectedBookingDetail.car || selectedBookingDetail.customTrip) && (
-                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
-                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Service</p>
-                                <p className="text-sm font-bold">
-                                    {(selectedBookingDetail.tour as any)?.title ||
-                                        (selectedBookingDetail.lodge as any)?.name ||
-                                        ((selectedBookingDetail.car as any)?.brand
-                                            ? `${(selectedBookingDetail.car as any)?.brand} ${(selectedBookingDetail.car as any)?.model || ''}`
-                                            : '') ||
-                                        (selectedBookingDetail.customTrip ? 'Custom Trip' : 'N/A')}
-                                </p>
-                            </div>
-                        )}
-
-                        {selectedBookingDetail.notes && (
-                            <div className="p-4 rounded-xl bg-surface border border-surface-border">
-                                <p className="text-xs uppercase text-neutral-500 font-bold mb-1">Notes</p>
-                                <p className="text-sm">{selectedBookingDetail.notes}</p>
-                            </div>
-                        )}
                     </div>
                 </div>
             )}

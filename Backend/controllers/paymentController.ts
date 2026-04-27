@@ -6,7 +6,7 @@ import Stripe from 'stripe';
 import { client } from '../utils/paypalClient';
 import Booking from '../models/bookingModel';
 import Payment from '../models/paymentModel';
-import { applyGatewayPaymentSuccess } from '../modules/bookings/payments/bookingPaymentService';
+import { applyGatewayPaymentFailure, applyGatewayPaymentSuccess } from '../modules/bookings/payments/bookingPaymentService';
 import logger from '../utils/logger';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
@@ -136,6 +136,18 @@ export const createStripeIntent = asyncHandler(async (req: any, res: any) => {
     res.json({ clientSecret: paymentIntent.client_secret });
 });
 
+// @desc Retrieve Stripe payment intent status
+// @route GET /api/payments/stripe-intent/:intentId
+export const getStripeIntentStatus = asyncHandler(async (req: Request, res: Response) => {
+    const intent = await stripe.paymentIntents.retrieve(req.params.intentId);
+    res.status(200).json({
+        id: intent.id,
+        status: intent.status,
+        bookingId: intent.metadata?.bookingId,
+        clientSecret: intent.client_secret,
+    });
+});
+
 // @desc Stripe Webhook
 export const handleStripeWebhook = async (req: any, res: any) => {
     const sig = req.headers['stripe-signature'] as string;
@@ -213,6 +225,27 @@ export const handleStripeWebhook = async (req: any, res: any) => {
         } catch (dbErr: any) {
             logger.error(`Database error during Stripe webhook: ${dbErr.message}`);
             return res.status(500).send('Internal Server Error');
+        }
+    } else if (event.type === 'payment_intent.payment_failed' || event.type === 'payment_intent.canceled') {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        const bookingId = intent.metadata.bookingId;
+        if (bookingId) {
+            const booking = await Booking.findById(bookingId);
+            if (booking) {
+                const txRef = `st_${intent.id}`;
+                await Payment.findOneAndUpdate(
+                    { stripePaymentIntentId: intent.id },
+                    { status: 'failed' },
+                    { new: true }
+                );
+                applyGatewayPaymentFailure(booking, {
+                    provider: 'stripe',
+                    txRef,
+                    stripePaymentIntentId: intent.id,
+                    notes: event.type === 'payment_intent.canceled' ? 'Payment intent canceled' : 'Payment failed',
+                });
+                await booking.save();
+            }
         }
     }
 

@@ -62,7 +62,7 @@ export const bookingsApi = {
     },
     adminUpdateStatus: async (
         id: string,
-        payload: { lifecycleStatus: 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled'; reason?: string; refundAmount?: number }
+        payload: { lifecycleStatus: 'draft' | 'pending_payment' | 'confirmed' | 'completed' | 'cancelled'; reason?: string; refundAmount?: number }
     ): Promise<Booking> => {
         const { data } = await apiClient.patch(`/admin/bookings/${id}/status`, payload);
         return data;
@@ -74,6 +74,12 @@ export const bookingsApi = {
         amount: number
     ): Promise<{ clientSecret: string | null }> => {
         const { data } = await apiClient.post(`/bookings/${bookingId}/payments/balance`, { amount });
+        return data;
+    },
+    getStripeIntentStatus: async (
+        intentId: string
+    ): Promise<{ id: string; status: string; bookingId?: string; clientSecret?: string | null }> => {
+        const { data } = await apiClient.get(`/payments/stripe-intent/${intentId}`);
         return data;
     },
 

@@ -1,6 +1,6 @@
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/providers/AuthProvider';
-import { setAuthRedirectPayload } from '@/utils/authRedirect';
+import { sanitizeRedirectTarget, setAuthRedirectPayload } from '@/utils/authRedirect';
 
 interface ProtectedRouteProps {
     children: React.ReactNode;
@@ -20,9 +20,15 @@ export function ProtectedRoute({ children, adminOnly = false }: ProtectedRoutePr
     }
 
     if (!user) {
-        const returnTo = `${location.pathname}${location.search || ''}`;
-        setAuthRedirectPayload(returnTo);
-        return <Navigate to={`/auth/login?redirect=${encodeURIComponent(returnTo)}`} state={{ from: location }} replace />;
+        const requestedPath = `${location.pathname}${location.search || ''}`;
+        const returnTo = sanitizeRedirectTarget(requestedPath);
+
+        if (returnTo) {
+            setAuthRedirectPayload(returnTo);
+            return <Navigate to={`/auth/login?redirect=${encodeURIComponent(returnTo)}`} state={{ from: location }} replace />;
+        }
+
+        return <Navigate to="/auth/login" replace />;
     }
 
     if (adminOnly && !isAdmin) {

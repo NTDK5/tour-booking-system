@@ -4,6 +4,7 @@ import adminPackageRoutes from './adminPackageRoutes';
 import adminBookingRoutes from './adminBookingRoutes';
 import adminStaffRoutes from '../modules/staff/routes/staff.routes';
 import assignmentRoutes from '../modules/assignments/routes/assignment.routes';
+import calendarRoutes from '../modules/calendar/calendar.routes';
 import {
     getDashboardStats,
     getAvailability,
@@ -33,6 +34,7 @@ router.get('/resources', getResources);
 router.post('/resources/sync', syncResources);
 router.get('/calendar/bookings', getUnifiedCalendarBookings);
 router.post('/calendar/check-availability', checkUnifiedResourceAvailability);
+router.use('/calendar', calendarRoutes);
 
 /** Tour / package builder API — GET/POST/PATCH `/api/admin/packages`, etc. */
 router.use('/packages', adminPackageRoutes);

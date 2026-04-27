@@ -32,6 +32,8 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
 
 // Explicit Statuses
 export enum BookingStatus {
+    DRAFT = 'draft',
+    PENDING_PAYMENT = 'pending_payment',
     PENDING = 'pending',
     UNDER_REVIEW = 'under_review',
     OFFER_SENT = 'offer_sent',
@@ -46,6 +48,8 @@ export enum BookingStatus {
 }
 
 const STATUS_ALIAS_TO_CANONICAL: Record<string, string> = {
+    draft: BookingStatus.DRAFT,
+    pending_payment: BookingStatus.PENDING_PAYMENT,
     submitted: BookingStatus.UNDER_REVIEW,
     offered: BookingStatus.OFFER_SENT,
     accepted: BookingStatus.CONFIRMED,
@@ -76,7 +80,11 @@ const toSerializableBooking = (booking: any) => {
 
 // Helper to update availability
 const updateAvailabilityAfterBooking = async (booking: any, session?: any) => {
-    if (booking.status !== BookingStatus.CONFIRMED && booking.status !== BookingStatus.PENDING) {
+    if (
+        booking.status !== BookingStatus.CONFIRMED &&
+        booking.status !== BookingStatus.PENDING &&
+        booking.status !== BookingStatus.PENDING_PAYMENT
+    ) {
         return;
     }
 
@@ -174,6 +182,10 @@ export const createBooking = asyncHandler(async (req: any, res: any) => {
             }
             throw err;
         }
+
+        // Unified flow: every new booking enters pending payment unless admin confirms.
+        booking.lifecycleStatus = 'pending_payment' as any;
+        booking.status = 'pending_payment' as any;
 
         const bookingTypeNormalized = String(bookingType || '').toLowerCase();
         const bookingTypeForStorage = booking.bookingType as string;
@@ -880,7 +892,7 @@ export const checkAvailability = asyncHandler(async (req: Request, res: Response
     // Find overlapping bookings for this lodge
     const bookings = await Booking.find({
         lodge: lodgeId,
-        status: { $in: [BookingStatus.PENDING, BookingStatus.CONFIRMED] },
+        status: { $in: [BookingStatus.PENDING, BookingStatus.PENDING_PAYMENT, BookingStatus.CONFIRMED] },
         $or: [
             { checkInDate: { $lt: end }, checkOutDate: { $gt: start } }
         ]
@@ -901,21 +913,21 @@ export const checkAvailability = asyncHandler(async (req: Request, res: Response
     res.status(200).json(availability);
 });
 
-// Cron job for expiring pending bookings
+// Cron job for stale pending-payment bookings
 export const checkAndCancelExpiredBookings = async () => {
     const expirationTime = new Date(Date.now() - 24 * 60 * 60 * 1000); // 24 hours
     try {
         const result = await Booking.updateMany(
-            { status: BookingStatus.PENDING, createdAt: { $lt: expirationTime } },
-            { $set: { status: BookingStatus.EXPIRED } }
+            { status: { $in: [BookingStatus.PENDING, BookingStatus.PENDING_PAYMENT] }, createdAt: { $lt: expirationTime } },
+            { $set: { status: BookingStatus.CANCELLED, lifecycleStatus: 'cancelled' } }
         );
         if (result.modifiedCount > 0) {
-            logger.info(`Expired ${result.modifiedCount} pending bookings`);
+            logger.info(`Auto-cancelled ${result.modifiedCount} stale pending-payment bookings`);
             await createAuditLog({
-                action: 'Expired stale bookings',
+                action: 'Auto-cancel stale bookings',
                 actionType: 'SYSTEM',
                 resource: 'Booking',
-                details: `Auto-expired ${result.modifiedCount} pending bookings older than 24h`,
+                details: `Auto-cancelled ${result.modifiedCount} pending-payment bookings older than 24h`,
                 status: 'info',
                 actorRole: 'system',
                 metadata: { modifiedCount: result.modifiedCount },

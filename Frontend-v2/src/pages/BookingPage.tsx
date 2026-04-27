@@ -1,20 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, Calendar, CreditCard, Info, Users, AlertTriangle, Sparkles } from 'lucide-react';
+import { ArrowRight, Calendar, CreditCard, Info, Users, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/providers/AuthProvider';
 import { useTour } from '@/hooks/useTours';
 import { useLodge } from '@/hooks/useLodges';
-import { useCreateBooking, useBookingQuote, useTourBookingOptions } from '@/hooks/useBookings';
+import { useCreateBooking, useBookingQuote, usePayBookingBalance, useTourBookingOptions } from '@/hooks/useBookings';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { ProgressStepper } from '@/components/ui/ProgressStepper';
 import { BookingSummaryCard } from '@/components/ui/BookingSummaryCard';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { ErrorState } from '@/components/ui/ErrorState';
+import { clearBookingDraft, getBookingDraftKey, loadBookingDraft, saveBookingDraft } from '@/utils/bookingDraft';
 
-const STEPS = ['Selection', 'Travelers', 'Review', 'Payment'];
+const STEPS = ['Select Departure', 'Traveler Information', 'Review & Pricing', 'Payment', 'Confirmation'];
 
 type TravelerRow = {
     fullName: string;
@@ -63,6 +64,7 @@ export default function BookingPage() {
     } = useTourBookingOptions(tourId || '', bookingType === 'tour');
 
     const createBookingMutation = useCreateBooking();
+    const payBalanceMutation = usePayBookingBalance();
     const quoteMutation = useBookingQuote();
 
     const isLoading = isTourLoading || isLodgeLoading || (bookingType === 'tour' && isOptionsLoading);
@@ -86,6 +88,47 @@ export default function BookingPage() {
         }
         return 0;
     }, [bookingType, quote?.total, lodge, bookingData.roomType]);
+    const draftKey = useMemo(
+        () => getBookingDraftKey(tourId || '', bookingType as 'tour' | 'lodge' | 'car', user?._id),
+        [bookingType, tourId, user?._id]
+    );
+
+    useEffect(() => {
+        const draft = loadBookingDraft(draftKey);
+        if (!draft) return;
+        setStep(Math.max(1, Math.min(5, Number(draft.currentStep || 1))));
+        setBookingData((prev) => ({
+            ...prev,
+            startDate: draft.startDate || prev.startDate,
+            endDate: draft.endDate || prev.endDate,
+            guests: Math.max(1, Number(draft.guests || prev.guests || 1)),
+        }));
+        setChildren(Number(draft.children || 0));
+        setSelectedDepartureId(draft.departureId || '');
+        setSelectedAddons(Array.isArray(draft.selectedAddons) ? draft.selectedAddons : []);
+        setTravelers(Array.isArray(draft.travelers) && draft.travelers.length ? draft.travelers : travelers);
+        setNotes(draft.notes || '');
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [draftKey]);
+
+    useEffect(() => {
+        if (!tourId) return;
+        saveBookingDraft(draftKey, {
+            packageId: tourId,
+            departureId: selectedDepartureId || undefined,
+            travelers,
+            pricingSnapshot: quoteMutation.data?.pricingSnapshot || undefined,
+            bookingType: bookingType as 'tour' | 'lodge' | 'car',
+            startDate: bookingData.startDate,
+            endDate: bookingData.endDate,
+            guests: bookingData.guests,
+            children,
+            selectedAddons,
+            notes,
+            currentStep: step,
+            updatedAt: new Date().toISOString(),
+        });
+    }, [bookingData.endDate, bookingData.guests, bookingData.startDate, bookingType, children, draftKey, notes, quoteMutation.data?.pricingSnapshot, selectedAddons, selectedDepartureId, step, tourId, travelers]);
 
     const syncTravelerRows = (guestCount: number) => {
         setTravelers((prev) => {
@@ -128,7 +171,11 @@ export default function BookingPage() {
                 return;
             }
         }
-        setStep((s) => Math.min(s + 1, 4));
+        if (step === 2 && !isTravelerStepValid) {
+            toast.error('Please complete all traveler names before continuing.');
+            return;
+        }
+        setStep((s) => Math.min(s + 1, 5));
     };
     const prevStep = () => setStep((s) => Math.max(s - 1, 1));
 
@@ -155,7 +202,7 @@ export default function BookingPage() {
         const payload: any = {
             bookingType,
             numberOfPeople: bookingData.guests,
-            paymentMethod: 'paypal',
+            paymentMethod: 'card',
             notes,
             totalPrice,
         };
@@ -181,8 +228,18 @@ export default function BookingPage() {
 
         try {
             const booking = await createBookingMutation.mutateAsync(payload);
-            toast.success('Booking created. You can complete payment from booking history.');
-            navigate(`/dashboard/bookings`);
+            const balance = Number((booking as any)?.paymentSummary?.balanceDue ?? booking.totalPrice ?? totalPrice ?? 0);
+            if (balance > 0) {
+                const payRes = await payBalanceMutation.mutateAsync({ bookingId: booking._id, amount: balance });
+                if (payRes?.clientSecret) {
+                    setStep(5);
+                    navigate(`/booking/${tourId}/payment-retry?bookingId=${booking._id}&clientSecret=${encodeURIComponent(payRes.clientSecret)}`);
+                    return booking;
+                }
+            }
+            clearBookingDraft(draftKey);
+            setStep(5);
+            navigate(`/booking/${tourId}/confirmation?bookingId=${booking._id}`);
             return booking;
         } catch {
             // handled by hook
@@ -191,7 +248,7 @@ export default function BookingPage() {
     };
 
     if (isLoading) return <div className="p-20"><Skeleton className="h-96" /></div>;
-    if (!entity && !isLoading) return <ErrorState />;
+    if (!entity && !isLoading) return <ErrorState onRetry={() => window.location.reload()} />;
 
     return (
         <div className="min-h-screen bg-surface py-12 md:py-20">
@@ -475,25 +532,28 @@ export default function BookingPage() {
                                             <CreditCard className="w-5 h-5 text-primary" />
                                             Payment Overview
                                         </h3>
-                                        <p className="text-base text-neutral-300">
-                                            Booking creation stores an initial payment ledger row. You can complete payment from booking history.
-                                        </p>
+                                        <p className="text-base text-neutral-300">Payment is initiated immediately after booking creation and then redirected to secure retry/success pages.</p>
                                         {quote && (
                                             <div className="mt-4 grid md:grid-cols-2 gap-3 text-base">
                                                 <p>Total: <span className="font-bold">${quote.total.toFixed(2)}</span></p>
                                                 <p>Deposit due: <span className="font-bold">${quote.deposit.toFixed(2)}</span></p>
                                             </div>
                                         )}
-                                        <div className="mt-4 text-sm text-neutral-400 inline-flex items-center gap-2">
-                                            <Sparkles size={14} className="text-primary" />
-                                            You can pay balance later from Booking History when needed.
-                                        </div>
                                     </div>
                                     <div className="flex gap-4">
                                         <Button variant="secondary" onClick={prevStep} className="h-14 px-8 text-base">Back</Button>
-                                        <Button onClick={handleFinalConfirm} isLoading={createBookingMutation.isPending} className="h-14 px-12 text-base md:text-lg">
-                                            Complete Booking
+                                        <Button onClick={handleFinalConfirm} isLoading={createBookingMutation.isPending || payBalanceMutation.isPending} className="h-14 px-12 text-base md:text-lg">
+                                            Proceed to Secure Payment
                                         </Button>
+                                    </div>
+                                </motion.div>
+                            )}
+
+                            {step === 5 && (
+                                <motion.div key="step5" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="space-y-8">
+                                    <div className="card bg-surface-light p-6 md:p-8 border-surface-border rounded-3xl space-y-4">
+                                        <h3 className="text-2xl md:text-3xl font-bold text-white mb-2">Redirecting to confirmation</h3>
+                                        <p className="text-neutral-300">Your booking was captured. If this page remains, open your booking history and continue payment from the booking entry.</p>
                                     </div>
                                 </motion.div>
                             )}

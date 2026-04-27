@@ -1,15 +1,12 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
-/** Enterprise lifecycle (customer-facing journey) */
-export type BookingLifecycleStatus = 'pending' | 'confirmed' | 'in_progress' | 'completed' | 'cancelled';
-
-/** Legacy booking status enum (preserved for custom trips, offers, migrations) */
+/** Unified booking status model */
+export type BookingLifecycleStatus = 'draft' | 'pending_payment' | 'confirmed' | 'cancelled' | 'completed';
 export type LegacyBookingStatus =
+    | BookingLifecycleStatus
     | 'pending'
     | 'under_review'
     | 'offer_sent'
-    | 'confirmed'
-    | 'cancelled'
     | 'expired'
     | 'refunded'
     | 'submitted'
@@ -271,8 +268,23 @@ export const bookingSchema = new Schema<IBooking>(
         bookingNumber: { type: String, unique: true, sparse: true, trim: true },
         lifecycleStatus: {
             type: String,
-            enum: ['pending', 'confirmed', 'in_progress', 'completed', 'cancelled'],
-            default: 'pending',
+            enum: [
+                'draft',
+                'pending_payment',
+                'confirmed',
+                'cancelled',
+                'completed',
+                'pending',
+                'under_review',
+                'offer_sent',
+                'expired',
+                'refunded',
+                'submitted',
+                'offered',
+                'accepted',
+                'rejected',
+            ],
+            default: 'draft',
         },
         inventoryPhase: {
             type: String,
@@ -290,20 +302,8 @@ export const bookingSchema = new Schema<IBooking>(
         totalPrice: { type: Number, required: true, min: 0 },
         status: {
             type: String,
-            enum: [
-                'pending',
-                'under_review',
-                'offer_sent',
-                'confirmed',
-                'cancelled',
-                'expired',
-                'refunded',
-                'submitted',
-                'offered',
-                'accepted',
-                'rejected',
-            ],
-            default: 'pending',
+            enum: ['draft', 'pending_payment', 'confirmed', 'cancelled', 'completed'],
+            default: 'draft',
         },
         paymentMethod: {
             type: String,

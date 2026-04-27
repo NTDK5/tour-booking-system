@@ -26,6 +26,20 @@ export function useBooking(id: string) {
     });
 }
 
+export function useStripeIntentStatus(intentId: string) {
+    return useQuery({
+        queryKey: [...bookingKeys.all, 'stripe-intent', intentId],
+        queryFn: () => bookingsApi.getStripeIntentStatus(intentId),
+        enabled: !!intentId,
+        refetchInterval: (query) => {
+            const status = query.state.data?.status;
+            if (!status) return 2500;
+            if (status === 'succeeded' || status === 'canceled' || status === 'requires_payment_method') return false;
+            return 2500;
+        },
+    });
+}
+
 export function useCreateBooking() {
     const queryClient = useQueryClient();
     return useMutation({
@@ -115,7 +129,7 @@ export function usePayBookingBalance() {
         onSuccess: (_, variables) => {
             queryClient.invalidateQueries({ queryKey: bookingKeys.user() });
             queryClient.invalidateQueries({ queryKey: bookingKeys.detail(variables.bookingId) });
-            toast.success('Payment session created. Complete payment in the Stripe dialog integration step.');
+            toast.success('Payment session created. Continue to secure payment.');
         },
         onError: (error: any) => {
             toast.error(error?.response?.data?.message || 'Failed to start payment.');

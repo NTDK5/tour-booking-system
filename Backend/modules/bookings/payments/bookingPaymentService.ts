@@ -41,6 +41,10 @@ export function derivePaymentTotals(booking: IBooking): {
 export function syncBookingPaymentFields(booking: IBooking): void {
     const { paymentStatus } = derivePaymentTotals(booking);
     booking.paymentStatus = paymentStatus;
+    if (booking.lifecycleStatus !== 'cancelled' && booking.lifecycleStatus !== 'completed') {
+        booking.lifecycleStatus = paymentStatus === 'paid' ? 'confirmed' : 'pending_payment';
+        booking.status = booking.lifecycleStatus as any;
+    }
 }
 
 /** Append ledger entry and refresh paymentStatus */
@@ -118,6 +122,38 @@ export async function applyGatewayPaymentSuccess(
     if (booking.departureId && booking.inventoryPhase === 'reserved') {
         await confirmDepartureSeats(booking.departureId, booking.numberOfPeople);
         booking.inventoryPhase = 'confirmed';
+    }
+}
+
+export function applyGatewayPaymentFailure(
+    booking: IBooking,
+    params: {
+        provider: 'paypal' | 'stripe';
+        txRef: string;
+        stripePaymentIntentId?: string;
+        notes?: string;
+    }
+): void {
+    const exists = booking.paymentLedger?.some(
+        (e) => e.transactionReference === params.txRef && e.status === 'failed'
+    );
+    if (!exists) {
+        appendLedgerEntry(booking, {
+            paymentType: 'balance',
+            amount: 0,
+            currency: booking.pricingSnapshot?.currency || 'USD',
+            method: params.provider === 'stripe' ? 'stripe' : 'paypal',
+            status: 'failed',
+            transactionReference: params.txRef,
+            provider: params.provider,
+            stripePaymentIntentId: params.stripePaymentIntentId,
+            notes: params.notes,
+        });
+    }
+
+    if (booking.lifecycleStatus !== 'cancelled' && booking.lifecycleStatus !== 'completed') {
+        booking.lifecycleStatus = 'pending_payment';
+        booking.status = 'pending_payment' as any;
     }
 }
 

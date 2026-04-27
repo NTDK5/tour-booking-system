@@ -13,6 +13,18 @@ import { useState } from 'react';
 import { resolveImageUrl } from '@/utils/url';
 import { useNavigate } from 'react-router-dom';
 
+const normalizeBookingStatus = (booking: any) => {
+    return booking.lifecycleStatus || booking.status || 'draft';
+};
+
+const bookingStatusView = (status: string) => {
+    if (status === 'pending_payment') return { label: 'PENDING PAYMENT', variant: 'warning' as const };
+    if (status === 'confirmed') return { label: 'CONFIRMED', variant: 'success' as const };
+    if (status === 'cancelled') return { label: 'CANCELLED', variant: 'secondary' as const };
+    if (status === 'completed') return { label: 'COMPLETED', variant: 'accent' as const };
+    return { label: 'DRAFT', variant: 'default' as const };
+};
+
 export default function BookingHistoryPage() {
     const { data: bookings, isLoading, isError, refetch } = useBookings();
     const navigate = useNavigate();
@@ -58,7 +70,7 @@ export default function BookingHistoryPage() {
         }
         const res = await payBalance.mutateAsync({ bookingId: booking._id, amount });
         if (res?.clientSecret) {
-            toast.success('Payment session created. Stripe form hookup is ready to be integrated.');
+            navigate(`/booking/${booking.tour?._id || booking._id}/payment-retry?bookingId=${booking._id}&clientSecret=${encodeURIComponent(res.clientSecret)}`);
         }
     };
 
@@ -117,6 +129,8 @@ export default function BookingHistoryPage() {
                     const bookingKind = getBookingKind(booking);
                     const bookingTitle = getBookingTitle(booking);
                     const coverImage = getBookingImage(booking);
+                    const normalizedStatus = normalizeBookingStatus(booking);
+                    const statusUi = bookingStatusView(normalizedStatus);
                     return (
                     <motion.div
                         key={booking._id}
@@ -149,13 +163,8 @@ export default function BookingHistoryPage() {
                                         {booking.bookingNumber || `#${booking._id.slice(-8).toUpperCase()}`}
                                     </p>
                                 </div>
-                                <Badge variant={
-                                    booking.status === 'confirmed' ? 'success' :
-                                        (booking.status === 'offered' || booking.status === 'offer_sent') ? 'warning' :
-                                            (booking.status === 'submitted' || booking.status === 'under_review') ? 'default' :
-                                                booking.status === 'pending' ? 'accent' : 'secondary'
-                                }>
-                                    {booking.status.toUpperCase()}
+                                <Badge variant={statusUi.variant}>
+                                    {statusUi.label}
                                 </Badge>
                             </div>
 
@@ -208,17 +217,17 @@ export default function BookingHistoryPage() {
                                             {booking.totalPrice > 0 ? `$${booking.totalPrice}` : 'Price TBD'}
                                         </div>
                                         <div className="flex gap-2 mt-2 justify-end">
-                                            {Number(booking?.paymentSummary?.balanceDue || 0) > 0 && booking.status !== 'cancelled' && (
+                                            {Number(booking?.paymentSummary?.balanceDue || 0) > 0 && normalizedStatus !== 'cancelled' && (
                                                 <Button
                                                     size="sm"
                                                     variant="accent"
                                                     onClick={() => handlePayBalance(booking)}
                                                     isLoading={payBalance.isPending}
                                                 >
-                                                    Pay Balance
+                                                    Continue Payment
                                                 </Button>
                                             )}
-                                            {booking.status !== 'cancelled' && (
+                                            {normalizedStatus !== 'cancelled' && (
                                                 <Button size="sm" variant="outline" onClick={() => handleCancel(booking._id)} isLoading={cancelBooking.isPending}>
                                                     Cancel
                                                 </Button>
