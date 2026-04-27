@@ -4,7 +4,7 @@ import Booking from '../models/bookingModel';
 import { ApiError } from '../utils/ApiError';
 import { toAdminBookingDTO } from '../modules/bookings/dto/bookingDto';
 import { appendLedgerEntry } from '../modules/bookings/payments/bookingPaymentService';
-import { cancelBookingWorkflow, confirmBookingWorkflow, markCompleted, markInProgress } from '../modules/bookings/workflow/bookingWorkflowService';
+import { cancelBookingWorkflow, confirmBookingWorkflow, markCompleted } from '../modules/bookings/workflow/bookingWorkflowService';
 import {
     assignGuide,
     assignVehicle,
@@ -170,8 +170,6 @@ export const adminUpdateBookingStatus = asyncHandler(async (req: any, res: any) 
         });
     } else if (lifecycleStatus === 'confirmed') {
         await confirmBookingWorkflow(booking, req.user?._id);
-    } else if (lifecycleStatus === 'in_progress') {
-        await markInProgress(booking, req.user?._id);
     } else if (lifecycleStatus === 'completed') {
         await markCompleted(booking, req.user?._id);
     } else if (lifecycleStatus === 'pending_payment' || lifecycleStatus === 'draft') {

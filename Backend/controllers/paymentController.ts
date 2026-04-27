@@ -139,7 +139,8 @@ export const createStripeIntent = asyncHandler(async (req: any, res: any) => {
 // @desc Retrieve Stripe payment intent status
 // @route GET /api/payments/stripe-intent/:intentId
 export const getStripeIntentStatus = asyncHandler(async (req: Request, res: Response) => {
-    const intent = await stripe.paymentIntents.retrieve(req.params.intentId);
+    const intentId = Array.isArray(req.params.intentId) ? req.params.intentId[0] : req.params.intentId;
+    const intent = await stripe.paymentIntents.retrieve(intentId);
     res.status(200).json({
         id: intent.id,
         status: intent.status,

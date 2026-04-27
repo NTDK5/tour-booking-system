@@ -20,7 +20,7 @@ function mapLifecycle(status?: string): BookingLifecycleStatus {
     const s = String(status || 'pending').toLowerCase();
     if (['cancelled', 'expired', 'refunded', 'rejected'].includes(s)) return 'cancelled';
     if (['confirmed', 'accepted'].includes(s)) return 'confirmed';
-    return 'pending';
+    return 'pending_payment';
 }
 
 function mapInventoryPhase(b: {
